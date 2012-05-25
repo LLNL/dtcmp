@@ -1,6 +1,6 @@
 /* Copyright (c) 2012, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
- * Written by Adam Moody <moody20@llnl.gov> and Edgar A. Leon <leon@llnl.gov>.
+ * Written by Adam Moody <moody20@llnl.gov>.
  * LLNL-CODE-557516.
  * All rights reserved.
  * This file is part of the DTCMP library.
