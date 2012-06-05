@@ -14,15 +14,12 @@
  *
  * Conventions:
  * Function names are often of the form:
- *   DTCMP_<OP><MODIFIER>_<TYPE>
+ *   DTCMP_<OP><MODIFIER>
  * where OP specfies the operation like:
  *   "Sort" or "Rank",
  * the MODIFIER may be one of:
  *   v - meaning that different MPI processes may provide different
- *       counts of input elements,
- * the TYPE can be one of:
- *   combined - meaning that satellite data is attached to the key
- *              in the same buffer */
+ *       counts of input elements */
 
 #ifndef DTCMP_H_
 #define DTCMP_H_
@@ -77,6 +74,10 @@ extern DTCMP_Op DTCMP_OP_NULL;
 /* predefined comparison operations */
 extern DTCMP_Op DTCMP_OP_INT_ASCEND;
 extern DTCMP_Op DTCMP_OP_INT_DESCEND;
+extern DTCMP_Op DTCMP_OP_FLOAT_ASCEND;
+extern DTCMP_Op DTCMP_OP_FLOAT_DESCEND;
+extern DTCMP_Op DTCMP_OP_DOUBLE_ASCEND;
+extern DTCMP_Op DTCMP_OP_DOUBLE_DESCEND;
 
 /* create a user-defined comparison operation,
  * associate datatype of key and compare function with handle */
@@ -139,7 +140,7 @@ int DTCMP_Memcpy(
  * and sets index to position within range *at* which target could
  * be inserted such that list is still in order and target would
  * be the first of any duplicates */
-int DTCMP_Search_low_combined(
+int DTCMP_Search_local_low(
   const void* target,  /* IN  - buffer holding target key */
   const void* list,    /* IN  - buffer holding ordered list of key/satellite items to search */
   int low,             /* IN  - lowest index to consider */
@@ -156,7 +157,7 @@ int DTCMP_Search_low_combined(
  * and sets index to position within range *after* which target could
  * be inserted such that list is still in order and target would
  * be the last of any duplicates */
-int DTCMP_Search_high_combined(
+int DTCMP_Search_local_high(
   const void* target,  /* IN  - buffer holding target key */
   const void* list,    /* IN  - buffer holding ordered list of key/satellite items to search */
   int low,             /* IN  - lowest index to consider */
@@ -168,9 +169,9 @@ int DTCMP_Search_high_combined(
   int* index           /* OUT - highest index in list where target could be inserted (integer) */
 );
 
-/* given an ordered list of targets, internally calls DTCMP_Search_low_combined
+/* given an ordered list of targets, internally calls DTCMP_Search_low
  * and returns index corresponding to each target */
-int DTCMP_Search_low_list_combined(
+int DTCMP_Search_local_low_list(
   int num,             /* IN  - number of targets (integer) */
   const void* targets, /* IN  - array holding target key */
   const void* list,    /* IN  - array holding ordered list of key/satellite items to search */
@@ -182,19 +183,22 @@ int DTCMP_Search_low_list_combined(
   int* indicies        /* OUT - lowest index in list where target could be inserted (integer) */
 );
 
-#if 0
-/* given a pivot value, partition values in inbuf to either side of pivot and return in outbuf */
-int DTCMP_Partition_combined(
-  const void* inbuf,   /* IN  - buffer holding elements to be partitioned */
-  void* outbuf,        /* OUT - buffer holding elements after partitioning */
-  int count,           /* IN  - number of input items on the calling process (non-negative integer) */
-  int inpivot,         /* IN  - index of pivot value within input values (non-negative integer) */
-  int* outpivot,       /* OUT - position of pivot element after partitioning */
-  MPI_Datatype key,    /* IN  - datatype of key (handle) */
-  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
-  DTCMP_Op cmp         /* IN  - key comparison function (handle) */
+/* ----------------------------------------------
+ * Partition functions
+ * ---------------------------------------------- */
+
+/* given an index to a pivot value, partition values in buf to either side of pivot,
+ * less than will be lower than pivot, greater will be after pivot, and equal values
+ * are evenly scattered to either side */
+int DTCMP_Partition_local(
+  void* buf,           /* INOUT - buffer holding elements to be partitioned */
+  int count,           /* IN    - number of input items on the calling process (non-negative integer) */
+  int inpivot,         /* IN    - index of pivot value within input values (non-negative integer) */
+  int* outpivot,       /* OUT   - position of pivot element after partitioning */
+  MPI_Datatype key,    /* IN    - datatype of key (handle) */
+  MPI_Datatype keysat, /* IN    - datatype of key and satellite (handle) */
+  DTCMP_Op cmp         /* IN    - key comparison function (handle) */
 );
-#endif
 
 /* ----------------------------------------------
  * Merge functions
@@ -202,7 +206,7 @@ int DTCMP_Partition_combined(
 
 /* merge num ordered lists pointed to by inbufs into
  * a single ordered list in outbuf */
-int DTCMP_Merge_combined(
+int DTCMP_Merge_local(
   int num,              /* IN  - number of input buffers (integer) */
   const void* inbufs[], /* IN  - start of each input buffer (array of length num) */ 
   int counts[],         /* IN  - number of items in each buffer (array of length num) */
@@ -213,12 +217,28 @@ int DTCMP_Merge_combined(
 );
 
 /* ----------------------------------------------
+ * Selection functions
+ * ---------------------------------------------- */
+
+/* given an array of items and a rank k, identify and return the location of the kth
+ * largest item in the array */
+int DTCMP_Select_local(
+  const void* buf,     /* IN  - buffer holding elements in which kth item is to be identified */
+  int count,           /* IN  - number of input items on the calling process (non-negative integer) */
+  int k,               /* IN  - rank of item to identify from 0 to (count-1) */
+  void* item,          /* OUT - copy of kth largest key */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
+  DTCMP_Op cmp         /* IN  - key comparison function (handle) */
+);
+
+/* ----------------------------------------------
  * Sort functions
  * ---------------------------------------------- */
 
-/* TODO: could implement as Sort_combined with comm == MPI_COMM_SELF */
+/* TODO: could implement as Sort with comm == MPI_COMM_SELF */
 /* sort a local set of elements */
-int DTCMP_Sort_local_combined(
+int DTCMP_Sort_local(
   const void* inbuf,   /* IN  - start of buffer containing input key/satellite items */
   void* outbuf,        /* OUT - start of buffer to hold output key/satellite items after sort */
   int count,           /* IN  - number of input items on the calling process (non-negative integer) */
@@ -229,7 +249,7 @@ int DTCMP_Sort_local_combined(
 
 /* all processes contribute the same number of elements to the sort,
  * and after sorting, ith process receives elements (i-1)*count to i*count */
-int DTCMP_Sort_combined(
+int DTCMP_Sort(
   const void* inbuf,   /* IN  - start of buffer containing input key/satellite items */
   void* outbuf,        /* OUT - start of buffer to hold output key/satellite items after sort */
   int count,           /* IN  - number of input items on the calling process (non-negative integer) */
@@ -241,7 +261,7 @@ int DTCMP_Sort_combined(
 
 /* each process may specify zero or more elements in inbuf to be sorted given by count,
  * and after sorting, ith process receives elements SUM(count_(1)..count(i-1)) to SUM(count(1)..count(i)) */
-int DTCMP_Sortv_combined(
+int DTCMP_Sortv(
   const void* inbuf,   /* IN  - start of buffer containing input key/satellite items */
   void* outbuf,        /* OUT - start of buffer to hold output key/satellite items after sort */
   int count,           /* IN  - number of input items on the calling process (non-negative integer) */
@@ -273,7 +293,7 @@ int DTCMP_Is_sorted(
  * group_ranks[i] returns the global number of items in that group,
  * group_rank[i] is set from 0 to group_ranks[i]-1 and it specifies the item's rank within its group,
  * with any ties broken first by MPI rank and then by the item's index within buf */
-int DTCMP_Rankv_combined(
+int DTCMP_Rankv(
   int count,           /* IN  - number of input items on the calling process (non-negative integer) */
   const void* buf,     /* IN  - start of buffer containing input key/satellite items */
   int* groups,         /* OUT - number of distinct items (non-negative integer) */

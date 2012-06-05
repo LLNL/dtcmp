@@ -33,6 +33,9 @@ void dtcmp_op_copy(DTCMP_Op* dst, DTCMP_Op src);
 
 int dtcmp_op_eval(const void* a, const void* b, DTCMP_Op cmp);
 
-
 int dtcmp_op_fn_int_ascend(const void*, const void*);
 int dtcmp_op_fn_int_descend(const void*, const void*);
+int dtcmp_op_fn_float_ascend(const void*, const void*);
+int dtcmp_op_fn_float_descend(const void*, const void*);
+int dtcmp_op_fn_double_ascend(const void*, const void*);
+int dtcmp_op_fn_double_descend(const void*, const void*);

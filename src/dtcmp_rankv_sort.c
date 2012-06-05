@@ -426,7 +426,7 @@ static int assign_ids(
  * group_ranks[i] returns the global number of items in that group,
  * group_rank[i] is set from 0 to group_ranks[i]-1 and it specifies the item's rank within its group,
  * with any ties broken first by MPI rank and then by the item's index within buf */
-int DTCMP_Rankv_combined_sort(
+int DTCMP_Rankv_sort(
   int count,
   const void* buf,
   int* groups,
@@ -510,7 +510,7 @@ int DTCMP_Rankv_combined_sort(
   }
 
   /* sort items */
-  tmp_rc = DTCMP_Sortv_combined(
+  tmp_rc = DTCMP_Sortv(
     DTCMP_IN_PLACE, sortbuf, count,
     type_item, type_item, cmp_item, comm
   );
@@ -571,7 +571,7 @@ int DTCMP_Rankv_combined_sort(
 
   /* TODO: replace this sort with DSDE operation */
   /* sort back to sender */
-  tmp_rc = DTCMP_Sortv_combined(
+  tmp_rc = DTCMP_Sortv(
     DTCMP_IN_PLACE, returnbuf, count,
     type_2int, type_5int, cmp_2int, comm
   );
@@ -660,7 +660,7 @@ int DTCMP_Rankv_strings_sort(
   DTCMP_Op_create(type_string, dtcmp_op_fn_string_ascend, &cmp_string);
 
   /* rank items */
-  int rc = DTCMP_Rankv_combined_sort(
+  int rc = DTCMP_Rankv_sort(
     count, buf,
     groups, group_id, group_ranks, group_rank,
     type_string, type_string, cmp_string, comm

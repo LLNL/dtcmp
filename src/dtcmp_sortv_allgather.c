@@ -11,7 +11,7 @@
 #include "dtcmp_internal.h"
 
 /* gather all items to each node and sort locally */
-int DTCMP_Sortv_combined_allgather(
+int DTCMP_Sortv_allgather(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -27,8 +27,8 @@ int DTCMP_Sortv_combined_allgather(
 
   if (ranks > 0) {
     /* allocate space to hold counts and displacements for allgatherv call */
-    int* counts = (int*) malloc(ranks * sizeof(int));
-    int* displs = (int*) malloc(ranks * sizeof(int));
+    int* counts = (int*) dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
+    int* displs = (int*) dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
     /* gather counts from all ranks */
     MPI_Allgather(&count, 1, MPI_INT, counts, 1, MPI_INT, comm);
@@ -52,7 +52,7 @@ int DTCMP_Sortv_combined_allgather(
 
     /* allocate space to hold all items from all procs */
     size_t buf_size = total_count * true_extent;
-    char* buf = (char*) malloc(buf_size); 
+    char* buf = (char*) dtcmp_malloc(buf_size, 0, __FILE__, __LINE__); 
 
     /* gather all items, send from outbuf if IN_PLACE is specified */
     void* sendbuf = (void*) inbuf;
@@ -63,16 +63,16 @@ int DTCMP_Sortv_combined_allgather(
     MPI_Allgatherv(sendbuf, count, keysat, (void*)recvbuf, counts, displs, keysat, comm);
 
     /* sort items with local sort */
-    DTCMP_Sort_local_combined(DTCMP_IN_PLACE, recvbuf, total_count, key, keysat, cmp);
+    DTCMP_Sort_local(DTCMP_IN_PLACE, recvbuf, total_count, key, keysat, cmp);
 
     /* copy our items into outbuf */
     char* mybuf = recvbuf + myoffset * true_extent;
     DTCMP_Memcpy(outbuf, count, keysat, (void*)mybuf, count, keysat);
 
     /* free off our temporary buffers */
-    free(buf);
-    free(displs);
-    free(counts);
+    dtcmp_free(&buf);
+    dtcmp_free(&displs);
+    dtcmp_free(&counts);
   }
 
   return DTCMP_SUCCESS;

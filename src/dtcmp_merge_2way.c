@@ -10,7 +10,7 @@
 #include <string.h>
 #include "dtcmp_internal.h"
 
-int dtcmp_merge_combined_2way_memcpy(
+int dtcmp_merge_local_2way_memcpy(
   int num,
   const void* inbufs[],
   int counts[],
@@ -54,7 +54,7 @@ int dtcmp_merge_combined_2way_memcpy(
   return DTCMP_SUCCESS;
 }
 
-int DTCMP_Merge_combined_2way(
+int DTCMP_Merge_local_2way(
   int num,
   const void* inbufs[],
   int counts[],

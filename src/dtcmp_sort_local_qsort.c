@@ -12,7 +12,7 @@
 
 /* execute qsort to sort local data
  * can do this if keysat is contiguous and if compare is basic op */
-int DTCMP_Sort_local_combined_qsort(
+int DTCMP_Sort_local_qsort(
   const void* inbuf, 
   void* outbuf,
   int count,

@@ -113,3 +113,55 @@ int dtcmp_op_fn_int_descend(const void* bufa, const void* bufb)
     return 0;
   }
 }
+
+int dtcmp_op_fn_float_ascend(const void* bufa, const void* bufb)
+{
+  float a = *(float*)bufa;
+  float b = *(float*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_float_descend(const void* bufa, const void* bufb)
+{
+  float a = *(float*)bufa;
+  float b = *(float*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_double_ascend(const void* bufa, const void* bufb)
+{
+  double a = *(double*)bufa;
+  double b = *(double*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_double_descend(const void* bufa, const void* bufb)
+{
+  double a = *(double*)bufa;
+  double b = *(double*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}

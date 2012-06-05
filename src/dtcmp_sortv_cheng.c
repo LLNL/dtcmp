@@ -95,7 +95,7 @@ static void compute_weighted_median(
   );
 
   /* sort by medians value (ensuring that count is non-zero) */
-  DTCMP_Sort_local_combined(
+  DTCMP_Sort_local(
     DTCMP_IN_PLACE, all_num_with_median, group_ranks,
     type_int_with_key, type_int_with_key, cmp_int_with_key
   );
@@ -323,8 +323,8 @@ static int find_splitters(
       int start_index = index[i];
       int end_index   = index[i] + num[i] - 1;
       int flag, lowest, highest;
-      DTCMP_Search_low_combined(target,  data, start_index, end_index, key, keysat, cmp, &flag, &lowest);
-      DTCMP_Search_high_combined(target, data, lowest,      end_index, key, keysat, cmp, &flag, &highest);
+      DTCMP_Search_local_low(target,  data, start_index, end_index, key, keysat, cmp, &flag, &lowest);
+      DTCMP_Search_local_high(target, data, lowest,      end_index, key, keysat, cmp, &flag, &highest);
       counts[i*2+LT] = lowest - start_index;
       counts[i*2+EQ] = (highest + 1) - lowest;
     }
@@ -443,7 +443,7 @@ static int find_splitters(
       }
 
       /* TODO: convert this to a kway merge */
-      DTCMP_Sort_local_combined(DTCMP_IN_PLACE, recvdata, numrecv, key, key, cmp);
+      DTCMP_Sort_local(DTCMP_IN_PLACE, recvdata, numrecv, key, key, cmp);
 
       /* identify kth element and broadcast */
       int k_index = k[group_rank] - 1;
@@ -485,7 +485,7 @@ static int find_splitters(
   return 0;
 }
 
-int DTCMP_Sortv_combined_cheng(
+int DTCMP_Sortv_cheng(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -552,7 +552,7 @@ int DTCMP_Sortv_combined_cheng(
   );
 
   /* search for index values for these split points in our local data */
-  DTCMP_Search_low_list_combined(
+  DTCMP_Search_local_low_list(
     group_ranks, splitters, outbuf, 0, count-1,
     key, keysat, cmp, indicies
   );
@@ -610,7 +610,7 @@ int DTCMP_Sortv_combined_cheng(
       ksizes[i] = elements;
       koffset += elements * keysat_true_extent;
     }
-    DTCMP_Merge_combined(group_ranks, kbufs, ksizes, outbuf, key, keysat, cmp);
+    DTCMP_Merge_local(group_ranks, kbufs, ksizes, outbuf, key, keysat, cmp);
   }
 
   /* free our scratch space */

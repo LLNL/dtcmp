@@ -11,7 +11,7 @@
 #include "dtcmp_internal.h"
 
 /* execute a purely local sort */
-int DTCMP_Sort_local_combined_insertionsort(
+int DTCMP_Sort_local_insertionsort(
   const void* inbuf, 
   void* outbuf,
   int count,

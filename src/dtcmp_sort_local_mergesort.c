@@ -12,7 +12,7 @@
 #include "dtcmp_internal.h"
 
 /* execute qsort to sort local data */
-static int dtcmp_sort_local_combined_mergesort_scratch(
+static int dtcmp_sort_local_mergesort_scratch(
   void* buf,
   void* scratch,
   int count,
@@ -37,9 +37,9 @@ static int dtcmp_sort_local_combined_mergesort_scratch(
   bufs[1] = (char*)buf + counts[0] * size;
 
   /* sort each half and merge them back together */
-  dtcmp_sort_local_combined_mergesort_scratch(bufs[0], scratch, counts[0], size, cmp);
-  dtcmp_sort_local_combined_mergesort_scratch(bufs[1], scratch, counts[1], size, cmp);
-  dtcmp_merge_combined_2way_memcpy(2, (const void**)bufs, counts, scratch, size, cmp);
+  dtcmp_sort_local_mergesort_scratch(bufs[0], scratch, counts[0], size, cmp);
+  dtcmp_sort_local_mergesort_scratch(bufs[1], scratch, counts[1], size, cmp);
+  dtcmp_merge_local_2way_memcpy(2, (const void**)bufs, counts, scratch, size, cmp);
 
   /* copy data from scratch back to our buffer */
   memcpy(buf, scratch, count * size);
@@ -48,7 +48,7 @@ static int dtcmp_sort_local_combined_mergesort_scratch(
 }
 
 /* execute a purely local sort */
-int DTCMP_Sort_local_combined_mergesort(
+int DTCMP_Sort_local_mergesort(
   const void* inbuf, 
   void* outbuf,
   int count,
@@ -72,7 +72,7 @@ int DTCMP_Sort_local_combined_mergesort(
 
     /* execute our merge sort */
     size_t size = (size_t) extent;
-    rc = dtcmp_sort_local_combined_mergesort_scratch(outbuf, scratch, count, size, cmp);
+    rc = dtcmp_sort_local_mergesort_scratch(outbuf, scratch, count, size, cmp);
 
     /* free scratch space */
     dtcmp_free(&scratch);

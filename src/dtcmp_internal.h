@@ -38,6 +38,10 @@ typedef struct {
 /* dup of MPI_COMM_SELF that we need for DTCMP_Memcpy */
 extern MPI_Comm dtcmp_comm_self;
 
+/* we call rand_r() to acquire random numbers,
+ * and this keeps track of the seed between calls */
+extern unsigned dtcmp_rand_seed;
+
 /* ---------------------------------------
  * Utility functions
  * --------------------------------------- */
@@ -49,7 +53,7 @@ void dtcmp_free(void*);
  * Seach implementations
  * --------------------------------------- */
 
-int DTCMP_Search_low_combined_binary(
+int DTCMP_Search_local_low_binary(
   const void* target,
   const void* list,
   int low,
@@ -61,7 +65,7 @@ int DTCMP_Search_low_combined_binary(
   int* index
 );
 
-int DTCMP_Search_high_combined_binary(
+int DTCMP_Search_local_high_binary(
   const void* target,
   const void* list,
   int low,
@@ -73,7 +77,7 @@ int DTCMP_Search_high_combined_binary(
   int* index
 );
 
-int DTCMP_Search_low_list_combined_binary(
+int DTCMP_Search_local_low_list_binary(
   int num,
   const void* targets,
   const void* list,
@@ -89,7 +93,7 @@ int DTCMP_Search_low_list_combined_binary(
  * Parition implementations
  * --------------------------------------- */
 
-int dtcmp_partition_combined_memcpy(
+int dtcmp_partition_local_memcpy(
   void* buf,
   void* scratch,
   int pivot,
@@ -98,11 +102,21 @@ int dtcmp_partition_combined_memcpy(
   DTCMP_Op cmp
 );
 
+int DTCMP_Partition_local_dtcpy(
+  void* buf,
+  int count,
+  int inpivot,
+  int* outpivot,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp
+);
+
 /* ---------------------------------------
  * Merge implementations
  * --------------------------------------- */
 
-int dtcmp_merge_combined_2way_memcpy(
+int dtcmp_merge_local_2way_memcpy(
   int num,
   const void* inbufs[],
   int counts[],
@@ -111,7 +125,7 @@ int dtcmp_merge_combined_2way_memcpy(
   DTCMP_Op cmp
 );
 
-int DTCMP_Merge_combined_2way(
+int DTCMP_Merge_local_2way(
   int num,
   const void* inbufs[],
   int counts[],
@@ -121,7 +135,7 @@ int DTCMP_Merge_combined_2way(
   DTCMP_Op cmp
 );
 
-int DTCMP_Merge_combined_kway_heap(
+int DTCMP_Merge_local_kway_heap(
   int k,
   const void* inbufs[],
   int counts[],
@@ -131,11 +145,45 @@ int DTCMP_Merge_combined_kway_heap(
   DTCMP_Op cmp
 );
 
+int dtcmp_select_local_ends(
+  void* buf,
+  int num,
+  int k,
+  void* item,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp
+);
+
+/* ---------------------------------------
+ * Local select implementations
+ * --------------------------------------- */
+
+int DTCMP_Select_local_ends(
+  const void* buf,
+  int num,
+  int k,
+  void* item,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp
+);
+
+int DTCMP_Select_local_randpartition(
+  const void* buf,
+  int num,
+  int k,
+  void* item,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp
+);
+
 /* ---------------------------------------
  * Local sort implementations
  * --------------------------------------- */
 
-int DTCMP_Sort_local_combined_insertionsort(
+int DTCMP_Sort_local_insertionsort(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -144,7 +192,7 @@ int DTCMP_Sort_local_combined_insertionsort(
   DTCMP_Op cmp
 );
 
-int DTCMP_Sort_local_combined_randquicksort(
+int DTCMP_Sort_local_randquicksort(
   const void* inbuf, 
   void* outbuf,
   int count,
@@ -153,7 +201,7 @@ int DTCMP_Sort_local_combined_randquicksort(
   DTCMP_Op cmp
 );
 
-int DTCMP_Sort_local_combined_mergesort(
+int DTCMP_Sort_local_mergesort(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -162,7 +210,7 @@ int DTCMP_Sort_local_combined_mergesort(
   DTCMP_Op cmp
 );
 
-int DTCMP_Sort_local_combined_qsort(
+int DTCMP_Sort_local_qsort(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -175,7 +223,7 @@ int DTCMP_Sort_local_combined_qsort(
  * Sort implementations
  * --------------------------------------- */
 
-int DTCMP_Sort_combined_allgather(
+int DTCMP_Sort_allgather(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -185,7 +233,7 @@ int DTCMP_Sort_combined_allgather(
   MPI_Comm comm
 );
 
-int DTCMP_Sort_combined_bitonic(
+int DTCMP_Sort_bitonic(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -199,7 +247,7 @@ int DTCMP_Sort_combined_bitonic(
  * Sortv implementations
  * --------------------------------------- */
 
-int DTCMP_Sortv_combined_allgather(
+int DTCMP_Sortv_allgather(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -209,7 +257,7 @@ int DTCMP_Sortv_combined_allgather(
   MPI_Comm comm
 );
 
-int DTCMP_Sortv_combined_sortgather_scatter(
+int DTCMP_Sortv_sortgather_scatter(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -219,7 +267,7 @@ int DTCMP_Sortv_combined_sortgather_scatter(
   MPI_Comm comm
 );
 
-int DTCMP_Sortv_combined_cheng(
+int DTCMP_Sortv_cheng(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -236,7 +284,7 @@ int DTCMP_Sortv_combined_cheng(
  * Rankv implementations
  * --------------------------------------- */
 
-int DTCMP_Rankv_combined_sort(
+int DTCMP_Rankv_sort(
   int count,
   const void* buf,
   int* groups,

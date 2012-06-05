@@ -11,7 +11,7 @@
 #include "dtcmp_internal.h"
 
 /* merges k sorted lists into into single sorted list using a min-heap merge */
-int DTCMP_Merge_combined_kway_heap(
+int DTCMP_Merge_local_kway_heap(
   int k,                /* IN  - number of input buffers (integer) */
   const void* inbufs[], /* IN  - start of each input buffer (array of length num) */ 
   int counts[],         /* IN  - number of items in each buffer (array of length num) */

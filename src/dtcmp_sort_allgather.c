@@ -10,7 +10,7 @@
 #include "mpi.h"
 #include "dtcmp_internal.h"
 
-int DTCMP_Sort_combined_allgather(
+int DTCMP_Sort_allgather(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -33,7 +33,7 @@ int DTCMP_Sort_combined_allgather(
 
     /* allocate space to hold all items from all procs */
     size_t buf_size = total_count * true_extent;
-    char* buf = (char*) malloc(buf_size); 
+    char* buf = (char*) dtcmp_malloc(buf_size, 0, __FILE__, __LINE__); 
 
     /* gather all items, send from outbuf if IN_PLACE is specified */
     void* sendbuf = (void*) inbuf;
@@ -44,14 +44,14 @@ int DTCMP_Sort_combined_allgather(
     MPI_Allgather(sendbuf, count, keysat, (void*)recvbuf, count, keysat, comm);
 
     /* sort items with local sort */
-    DTCMP_Sort_local_combined(DTCMP_IN_PLACE, recvbuf, total_count, key, keysat, cmp);
+    DTCMP_Sort_local(DTCMP_IN_PLACE, recvbuf, total_count, key, keysat, cmp);
 
     /* copy our items into outbuf */
     char* mybuf = recvbuf + count * rank * true_extent;
     DTCMP_Memcpy(outbuf, count, keysat, (void*)mybuf, count, keysat);
 
     /* free off our temporary buffers */
-    free(buf);
+    dtcmp_free(&buf);
   }
 
   return DTCMP_SUCCESS;

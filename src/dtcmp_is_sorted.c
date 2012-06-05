@@ -137,6 +137,15 @@ int DTCMP_Is_sorted(
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &ranks);
 
+  /* first, step through and check that all of our local items are in order */
+  DTCMP_Is_sorted_local(buf, count, key, keysat, cmp, &sorted);
+
+  /* bail out at this point if ranks == 1 */
+  if (ranks <= 1) {
+    *flag = sorted;
+    return DTCMP_SUCCESS;
+  }
+
   /* get extent of keysat */
   MPI_Aint lb, extent;
   MPI_Type_get_extent(keysat, &lb, &extent);
@@ -144,11 +153,6 @@ int DTCMP_Is_sorted(
   /* get true extent of key */
   MPI_Aint key_true_lb, key_true_extent;
   MPI_Type_get_true_extent(key, &key_true_lb, &key_true_extent);
-
-  /* first, step through and check that all of our local items are in order */
-  DTCMP_Is_sorted_local(buf, count, key, keysat, cmp, &sorted);
-
-  /* TODO: could bail out at this point if ranks == 1 */
 
   /* TODO: if we know that each proc has an item,
    * we could just do a single pt2pt send to the rank one higher,

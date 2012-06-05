@@ -23,7 +23,7 @@
  * and sorted as the last step at the root, then scatter the sorted
  * elements back to children passing down same number they passed up */
 
-int DTCMP_Sortv_combined_sortgather_scatter(
+int DTCMP_Sortv_sortgather_scatter(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -77,7 +77,7 @@ int DTCMP_Sortv_combined_sortgather_scatter(
   reduce[MIN] = count; /* minimum count across all ranks */
   reduce[MAX] = count; /* maximum count across all ranks */
   reduce[SUM] = count; /* sum of counts across all ranks */
-  reduce[LEV] = -1;    /* min iteration at which some rank has max # elems */
+  reduce[LEV] = 0;     /* min iteration at which some rank has max # elems */
 
   /* send counts up tree to determine how many elements each
    * child will contribute, remember the iteration in which we send */
@@ -135,14 +135,14 @@ int DTCMP_Sortv_combined_sortgather_scatter(
 
           /* check whether any task has reached its threshold, and if
            * so record the lowest iteration in which happens */
-          if (reduce[LEV] == -1) {
-            if (recv_reduce[LEV] != -1) {
-              /* if we haven't reached the threshold but out child has,
+          if (reduce[LEV] == 0) {
+            if (recv_reduce[LEV] != 0) {
+              /* if we haven't reached the threshold but our child has,
                * then set our level value to our child's */
               reduce[LEV] = recv_reduce[LEV];
             } else if (reduce[SUM] > threshold) {
               /* otherwise, if we have reached the threshold,
-               * record the current iteration (plus one) */ 
+               * record the current iteration plus one, since 0 means NULL */ 
               reduce[LEV] = iter + 1;
             }
           }
@@ -213,7 +213,7 @@ int DTCMP_Sortv_combined_sortgather_scatter(
     buf = outbuf;
   }
   DTCMP_Memcpy(send_buf, count, keysat, (void*)buf, count, keysat);
-  DTCMP_Sort_local_combined(DTCMP_IN_PLACE, send_buf, count, key, keysat, cmp);
+  DTCMP_Sort_local(DTCMP_IN_PLACE, send_buf, count, key, keysat, cmp);
 
   /* gather data to sorters (and sort the data as it is gathered) */
   dist = 1;
@@ -248,7 +248,7 @@ int DTCMP_Sortv_combined_sortgather_scatter(
         int counts[2];
         counts[0] = send_count;
         counts[1] = recv_count;
-        DTCMP_Merge_combined(2, inbufs, counts, merge_buf, key, keysat, cmp);
+        DTCMP_Merge_local(2, inbufs, counts, merge_buf, key, keysat, cmp);
 
         /* swap our send buffer with our merge buffer */
         void* tmp_buf = send_buf;
@@ -295,7 +295,7 @@ int DTCMP_Sortv_combined_sortgather_scatter(
       }
 
       /* parallel sort */
-      DTCMP_Sortv_combined_cheng(
+      DTCMP_Sortv_cheng(
         send_buf, recv_buf, (int)elem_count, key, keysat, cmp,
         sort_rank, sort_ranks, sort_group, comm
       );

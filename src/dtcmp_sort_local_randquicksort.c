@@ -11,7 +11,7 @@
 #include "mpi.h"
 #include "dtcmp_internal.h"
 
-static int DTCMP_Sort_local_combined_randquicksort_scratch(
+static int DTCMP_Sort_local_randquicksort_scratch(
   void* buf,
   void* scratch,
   int num,
@@ -27,25 +27,25 @@ static int DTCMP_Sort_local_combined_randquicksort_scratch(
 
   /* identify pivot value */
 //  int pivot = 0;
-  int pivot = rand() % num;
+  int pivot = rand_r(&dtcmp_rand_seed) % num;
 
   /* parition items in buf around pivot */
-  int index = dtcmp_partition_combined_memcpy(buf, scratch, pivot, num, size, cmp);
+  int index = dtcmp_partition_local_memcpy(buf, scratch, pivot, num, size, cmp);
 
   /* sort items less than pivot */
   int lowcount = index;
-  DTCMP_Sort_local_combined_randquicksort_scratch(buf, scratch, lowcount, size, cmp);
+  DTCMP_Sort_local_randquicksort_scratch(buf, scratch, lowcount, size, cmp);
 
   /* sort items larger than pivot */
   int highcount = num - index - 1;
   void* highbuf = (char*)buf + (index + 1) * size;
-  DTCMP_Sort_local_combined_randquicksort_scratch(highbuf, scratch, highcount, size, cmp);
+  DTCMP_Sort_local_randquicksort_scratch(highbuf, scratch, highcount, size, cmp);
 
   return DTCMP_SUCCESS;
 }
 
 /* execute a purely local sort */
-int DTCMP_Sort_local_combined_randquicksort(
+int DTCMP_Sort_local_randquicksort(
   const void* inbuf, 
   void* outbuf,
   int count,
@@ -69,7 +69,7 @@ int DTCMP_Sort_local_combined_randquicksort(
 
     /* execute our merge sort */
     size_t size = extent;
-    rc = DTCMP_Sort_local_combined_randquicksort_scratch(outbuf, scratch, count, size, cmp);
+    rc = DTCMP_Sort_local_randquicksort_scratch(outbuf, scratch, count, size, cmp);
 
     /* free scratch space */
     dtcmp_free(&scratch);

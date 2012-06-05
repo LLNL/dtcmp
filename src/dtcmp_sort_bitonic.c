@@ -12,7 +12,8 @@
 
 /* given same number of items per process, execute Batcher's bitonic sort */
 
-static int DTCMP_Sort_combined_bitonic_merge_single(
+/* this version assumes each process has exactly one item */
+static int DTCMP_Sort_bitonic_merge_single(
   void* value,
   void* recv,
   MPI_Datatype keysat,
@@ -52,7 +53,7 @@ static int DTCMP_Sort_combined_bitonic_merge_single(
       }
 
       /* recursively merge our half */
-      DTCMP_Sort_combined_bitonic_merge_single(value, recv, keysat, cmp, rank, start, dist, direction, comm);
+      DTCMP_Sort_bitonic_merge_single(value, recv, keysat, cmp, rank, start, dist, direction, comm);
     } else {
       int dst_rank = rank - dist;
       if (dst_rank >= start) {
@@ -73,14 +74,15 @@ static int DTCMP_Sort_combined_bitonic_merge_single(
       /* recursively merge our half */
       int new_start = start + dist;
       int new_num   = num - dist;
-      DTCMP_Sort_combined_bitonic_merge_single(value, recv, keysat, cmp, rank, new_start, new_num, direction, comm);
+      DTCMP_Sort_bitonic_merge_single(value, recv, keysat, cmp, rank, new_start, new_num, direction, comm);
     }
   }
 
   return 0;
 }
 
-static int DTCMP_Sort_combined_bitonic_sort_single(
+/* this version assumes each process has exactly one item */
+static int DTCMP_Sort_bitonic_sort_single(
   void* value,
   void* recv,
   MPI_Datatype keysat,
@@ -95,21 +97,22 @@ static int DTCMP_Sort_combined_bitonic_sort_single(
     /* recursively divide and sort each half */
     int mid = num / 2;
     if (rank < start + mid) {
-      DTCMP_Sort_combined_bitonic_sort_single(value, recv, keysat, cmp, rank, start, mid, !direction, comm);
+      DTCMP_Sort_bitonic_sort_single(value, recv, keysat, cmp, rank, start, mid, !direction, comm);
     } else {
       int new_start = start + mid;
       int new_num   = num - mid;
-      DTCMP_Sort_combined_bitonic_sort_single(value, recv, keysat, cmp, rank, new_start, new_num, direction, comm);
+      DTCMP_Sort_bitonic_sort_single(value, recv, keysat, cmp, rank, new_start, new_num, direction, comm);
     }
 
     /* merge the two sorted halves */
-    DTCMP_Sort_combined_bitonic_merge_single(value, recv, keysat, cmp, rank, start, num, direction, comm);
+    DTCMP_Sort_bitonic_merge_single(value, recv, keysat, cmp, rank, start, num, direction, comm);
   }
 
   return 0;
 }
 
-static int DTCMP_Sort_combined_bitonic_merge_multiple(
+/* this version assumes all procs have the same number of items, which can be 1 or more */
+static int DTCMP_Sort_bitonic_merge_multiple(
   void* value,
   void* recv,
   void* merge,
@@ -154,7 +157,7 @@ static int DTCMP_Sort_combined_bitonic_merge_multiple(
         bufs[1] = recv;
         counts[0] = count;
         counts[1] = count;
-        DTCMP_Merge_combined(2, bufs, counts, merge, key, keysat, cmp);
+        DTCMP_Merge_local(2, bufs, counts, merge, key, keysat, cmp);
         if (direction) {
           /* if we're in the lower half of the procs and direction is increasing, take the lower half of the values */
           DTCMP_Memcpy(value, count, keysat, merge, count, keysat);
@@ -166,7 +169,7 @@ static int DTCMP_Sort_combined_bitonic_merge_multiple(
       }
 
       /* recursively merge our half */
-      DTCMP_Sort_combined_bitonic_merge_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, start, dist, direction, comm);
+      DTCMP_Sort_bitonic_merge_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, start, dist, direction, comm);
     } else {
       int dst_rank = rank - dist;
       if (dst_rank >= start) {
@@ -183,7 +186,7 @@ static int DTCMP_Sort_combined_bitonic_merge_multiple(
         bufs[1] = value;
         counts[0] = count;
         counts[1] = count;
-        DTCMP_Merge_combined(2, bufs, counts, merge, key, keysat, cmp);
+        DTCMP_Merge_local(2, bufs, counts, merge, key, keysat, cmp);
         if (direction) {
           /* if we're in the upper half of the procs and direction is increasing, take the upper half of the values */
           void* target = merge + count * extent;
@@ -196,14 +199,15 @@ static int DTCMP_Sort_combined_bitonic_merge_multiple(
       /* recursively merge our half */
       int new_start = start + dist;
       int new_num   = num - dist;
-      DTCMP_Sort_combined_bitonic_merge_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, new_start, new_num, direction, comm);
+      DTCMP_Sort_bitonic_merge_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, new_start, new_num, direction, comm);
     }
   }
 
   return 0;
 }
 
-static int DTCMP_Sort_combined_bitonic_sort_multiple(
+/* this version assumes all procs have the same number of items, which can be 1 or more */
+static int DTCMP_Sort_bitonic_sort_multiple(
   void* value,
   void* recv,
   void* merge,
@@ -222,21 +226,21 @@ static int DTCMP_Sort_combined_bitonic_sort_multiple(
     /* recursively divide and sort each half */
     int mid = num / 2;
     if (rank < start + mid) {
-      DTCMP_Sort_combined_bitonic_sort_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, start, mid, !direction, comm);
+      DTCMP_Sort_bitonic_sort_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, start, mid, !direction, comm);
     } else {
       int new_start = start + mid;
       int new_num   = num - mid;
-      DTCMP_Sort_combined_bitonic_sort_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, new_start, new_num, direction, comm);
+      DTCMP_Sort_bitonic_sort_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, new_start, new_num, direction, comm);
     }
 
     /* merge the two sorted halves */
-    DTCMP_Sort_combined_bitonic_merge_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, start, num, direction, comm);
+    DTCMP_Sort_bitonic_merge_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, start, num, direction, comm);
   }
 
   return 0;
 }
 
-int DTCMP_Sort_combined_bitonic(
+int DTCMP_Sort_bitonic(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -248,13 +252,13 @@ int DTCMP_Sort_combined_bitonic(
   int rc = DTCMP_SUCCESS;
 
   /* get true extent of keysat */
-  MPI_Aint lb, extent;
-  MPI_Type_get_true_extent(keysat, &lb, &extent);
+  MPI_Aint true_lb, true_extent;
+  MPI_Type_get_true_extent(keysat, &true_lb, &true_extent);
 
   /* allocate scratch space to hold data */
-  void* value = dtcmp_malloc(count * extent, 0, __FILE__, __LINE__);
-  void* extra = dtcmp_malloc(count * extent, 0, __FILE__, __LINE__);
-  void* merge = dtcmp_malloc(2 * count * extent, 0, __FILE__, __LINE__);
+  void* value = dtcmp_malloc(count * true_extent, 0, __FILE__, __LINE__);
+  void* extra = dtcmp_malloc(count * true_extent, 0, __FILE__, __LINE__);
+  void* merge = dtcmp_malloc(2 * count * true_extent, 0, __FILE__, __LINE__);
 
   /* TODO: handle lower bound */
   /* copy our input items into the value buffer */
@@ -272,12 +276,14 @@ int DTCMP_Sort_combined_bitonic(
   /* conduct the bitonic sort */
   if (count == 1) {
     /* sort just a single element */
-    DTCMP_Sort_combined_bitonic_sort_single(value, extra, keysat, cmp, rank, 0, ranks, 1, comm);
+    DTCMP_Sort_bitonic_sort_single(value, extra, keysat, cmp, rank, 0, ranks, 1, comm);
   } else {
-    /* sort local elements */
-    DTCMP_Sort_local_combined(DTCMP_IN_PLACE, value, count, key, keysat, cmp);
-    DTCMP_Sort_combined_bitonic_sort_multiple(
-      value, extra, merge, count, key, keysat, extent, cmp,
+    /* sort local elements first */
+    DTCMP_Sort_local(DTCMP_IN_PLACE, value, count, key, keysat, cmp);
+
+    /* now sort across processes */
+    DTCMP_Sort_bitonic_sort_multiple(
+      value, extra, merge, count, key, keysat, true_extent, cmp,
       rank, 0, ranks, 1, comm
     );
   }

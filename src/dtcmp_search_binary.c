@@ -9,7 +9,7 @@
 
 #include "dtcmp_internal.h"
 
-int DTCMP_Search_low_combined_binary(
+int DTCMP_Search_local_low_binary(
   const void* target,  /* IN  - buffer holding target key */
   const void* list,    /* IN  - buffer holding ordered list of key/satellite items to search */
   int low,             /* IN  - number of items in list (non-negative integer) */
@@ -69,7 +69,7 @@ int DTCMP_Search_low_combined_binary(
   return DTCMP_SUCCESS;
 }
 
-int DTCMP_Search_high_combined_binary(
+int DTCMP_Search_local_high_binary(
   const void* target,  /* IN  - buffer holding target key */
   const void* list,    /* IN  - buffer holding ordered list of key/satellite items to search */
   int low,             /* IN  - number of items in list (non-negative integer) */
@@ -129,8 +129,8 @@ int DTCMP_Search_high_combined_binary(
   return DTCMP_SUCCESS;
 }
 
-/* calls DTCMP_Search_low_combined for an ordered list of targets and returns each corresponding index */
-int DTCMP_Search_low_list_combined_binary(
+/* calls DTCMP_Search_low for an ordered list of targets and returns each corresponding index */
+int DTCMP_Search_local_low_list_binary(
   int num,             /* IN  - number of targets (integer) */
   const void* targets, /* IN  - array holding target keys */
   const void* list,    /* IN  - array holding ordered list of key/satellite items to search */
@@ -150,7 +150,7 @@ int DTCMP_Search_low_list_combined_binary(
   int flag, index;
   int mid = num / 2;
   const void* target = (char*)targets + mid * target_extent;
-  DTCMP_Search_low_combined_binary(target, list, low, high, key, keysat, cmp, &flag, &index);
+  DTCMP_Search_local_low_binary(target, list, low, high, key, keysat, cmp, &flag, &index);
   indicies[mid] = index;
 
   /* use this index as a split point to recursively search each half for remaining targets */
@@ -162,7 +162,7 @@ int DTCMP_Search_low_list_combined_binary(
 
   /* recursively search the bottom half of our list for the bottom half of the remaining targets */
   if (mid > 0) {
-    DTCMP_Search_low_list_combined_binary(
+    DTCMP_Search_local_low_list_binary(
       mid, targets, list, low, index,
       key, keysat, cmp, indicies
     );
@@ -172,7 +172,7 @@ int DTCMP_Search_low_list_combined_binary(
   int upper_index = mid + 1;
   int upper_count = num - upper_index;
   if (upper_count > 0) {
-    DTCMP_Search_low_list_combined_binary(
+    DTCMP_Search_local_low_list_binary(
       upper_count, (char*)targets + upper_index * target_extent, list, index, high,
       key, keysat, cmp, indicies + upper_index
     );
