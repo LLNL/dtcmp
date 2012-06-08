@@ -27,13 +27,14 @@ OBJS= \
   dtcmp_sortv_allgather.o \
   dtcmp_sortv_sortgather_scatter.o \
   dtcmp_sortv_cheng.o \
+  dtcmp_sortz_samplesort.o \
   dtcmp_rankv_sort.o \
   ranklist_allreduce_recursive.o \
   ranklist_allgather_brucks.o \
   ranklist_alltoall_brucks.o \
   ranklist_alltoallv_linear.o
 
-all: clean libdtcmp.a main
+all: clean libdtcmp.a main tests
 
 libdtcmp.a: $(OBJS)
 	ar r $@ $(OBJS)
@@ -45,5 +46,8 @@ libdtcmp.a: $(OBJS)
 main: main.c *h libdtcmp.a
 	$(MPICC) $(OPT) $(CFLAGS) $< libdtcmp.a -o $@ $(LDFLAGS)
 
+tests: tests.c *h libdtcmp.a
+	$(MPICC) $(OPT) $(CFLAGS) $< libdtcmp.a -o $@ $(LDFLAGS)
+
 clean:
-	rm -rf include/* lib/* libdtcmp.a *.o main
+	rm -rf include/* lib/* libdtcmp.a *.o main tests

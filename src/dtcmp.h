@@ -14,12 +14,14 @@
  *
  * Conventions:
  * Function names are often of the form:
- *   DTCMP_<OP><MODIFIER>
+ *   DTCMP_<OP><MODIFIER>[_local]
  * where OP specfies the operation like:
  *   "Sort" or "Rank",
  * the MODIFIER may be one of:
  *   v - meaning that different MPI processes may provide different
- *       counts of input elements */
+ *       counts of input elements 
+ * the optional _local suffix implies the routine operates only with
+ * local data and no MPI communicator is required */
 
 #ifndef DTCMP_H_
 #define DTCMP_H_
@@ -30,6 +32,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ----------------------------------------------
+ * Constants
+ * ---------------------------------------------- */
 
 /* API return codes,
  * all user API calls return DTCMP_SUCCESS if successful */
@@ -114,6 +120,25 @@ int DTCMP_Op_free(
 );
 
 /* ----------------------------------------------
+ * Resource handles
+ * ---------------------------------------------- */
+
+/* handle to an object that tracks internal resources allocated during
+ * a DTCMP call, active handles must be freed with call to DTCMP_Free
+ * to free internal resources, but only after the application is done
+ * with the received data the handle refers to */
+typedef void* DTCMP_Handle;
+
+/* we define a NULL handle as DTCMP_HANDLE_NULL */
+extern DTCMP_Handle DTCMP_HANDLE_NULL;
+
+/* frees resources internally allocated in call to DTCMP_Sortz,
+ * sets handle to DTCMP_HANDLE_NULL */
+int DTCMP_Free(
+  DTCMP_Handle* handle /* INOUT - DTCMP resource (handle) */
+);
+
+/* ----------------------------------------------
  * Utility functions
  * ---------------------------------------------- */
 
@@ -140,7 +165,7 @@ int DTCMP_Memcpy(
  * and sets index to position within range *at* which target could
  * be inserted such that list is still in order and target would
  * be the first of any duplicates */
-int DTCMP_Search_local_low(
+int DTCMP_Search_low_local(
   const void* target,  /* IN  - buffer holding target key */
   const void* list,    /* IN  - buffer holding ordered list of key/satellite items to search */
   int low,             /* IN  - lowest index to consider */
@@ -157,7 +182,7 @@ int DTCMP_Search_local_low(
  * and sets index to position within range *after* which target could
  * be inserted such that list is still in order and target would
  * be the last of any duplicates */
-int DTCMP_Search_local_high(
+int DTCMP_Search_high_local(
   const void* target,  /* IN  - buffer holding target key */
   const void* list,    /* IN  - buffer holding ordered list of key/satellite items to search */
   int low,             /* IN  - lowest index to consider */
@@ -171,7 +196,7 @@ int DTCMP_Search_local_high(
 
 /* given an ordered list of targets, internally calls DTCMP_Search_low
  * and returns index corresponding to each target */
-int DTCMP_Search_local_low_list(
+int DTCMP_Search_low_list_local(
   int num,             /* IN  - number of targets (integer) */
   const void* targets, /* IN  - array holding target key */
   const void* list,    /* IN  - array holding ordered list of key/satellite items to search */
@@ -180,7 +205,8 @@ int DTCMP_Search_local_low_list(
   MPI_Datatype key,    /* IN  - datatype of key (handle) */
   MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
   DTCMP_Op cmp,        /* IN  - key comparison function (handle) */
-  int* indicies        /* OUT - lowest index in list where target could be inserted (integer) */
+  int flags[],         /* OUT - flag set to 1 if corresponding target is found, 0 otherwise (integer array of length num) */
+  int indicies[]       /* OUT - lowest index in list where target could be inserted (integer array of length num) */
 );
 
 /* ----------------------------------------------
@@ -188,7 +214,7 @@ int DTCMP_Search_local_low_list(
  * ---------------------------------------------- */
 
 /* given an index to a pivot value, partition values in buf to either side of pivot,
- * less than will be lower than pivot, greater will be after pivot, and equal values
+ * less than will be before pivot, greater than will be after pivot, and equal values
  * are evenly scattered to either side */
 int DTCMP_Partition_local(
   void* buf,           /* INOUT - buffer holding elements to be partitioned */
@@ -269,6 +295,18 @@ int DTCMP_Sortv(
   MPI_Datatype keysat, /* IN  - datatype containing key and satellite used to copy/transfer items (handle) */
   DTCMP_Op cmp,        /* IN  - comparison operation (handle) */
   MPI_Comm comm        /* IN  - communicator on which to execute sort (handle) */
+);
+
+int DTCMP_Sortz(
+  const void* inbuf,   /* IN  - start of buffer containing input key/satellite items */
+  int count,           /* IN  - number of input items on the calling process (non-negative integer) */
+  void** outbuf,       /* OUT - start of buffer to hold output key/satellite items after sort */
+  int* outcount,       /* OUT - number of items in output buffer (non-negative integer) */
+  MPI_Datatype key,    /* IN  - datatype to use to compare items (handle) */
+  MPI_Datatype keysat, /* IN  - datatype containing key and satellite used to copy/transfer items (handle) */
+  DTCMP_Op cmp,        /* IN  - comparison operation (handle) */
+  MPI_Comm comm,       /* IN  - communicator on which to execute sort (handle) */
+  DTCMP_Handle* handle /* OUT - handle to resources allocated during call (handle) */
 );
 
 /* check whether all items in buf are already in sorted order */

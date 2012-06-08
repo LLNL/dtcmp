@@ -101,6 +101,11 @@ int main(int argc, char* argv[])
 //  DTCMP_Sortv_allgather(insatbuf, outsatbuf, size, MPI_INT, type_2int, DTCMP_OP_INT_ASCEND, MPI_COMM_WORLD);
 //  DTCMP_Sortv_sortgather_scatter(insatbuf, outsatbuf, size, MPI_INT, type_2int, DTCMP_OP_INT_ASCEND, MPI_COMM_WORLD);
 //  DTCMP_Sortv_sortgather_scatter(insatbuf, outsatbuf, size, type_2int, type_2int, cmp_2int, MPI_COMM_WORLD);
+  int sortz_outcount;
+  void* sortz_outbuf;
+  DTCMP_Handle handle;
+  DTCMP_Sortz(insatbuf, size, &sortz_outbuf, &sortz_outcount, type_2int, type_2int, cmp_2int, MPI_COMM_WORLD, &handle);
+  DTCMP_Free(&handle);
 
   for (i = 0; i < size; i++) {
     printf("%d: item %d = %d(%d)\n", rank, i, outsatbuf[i*2+0], outsatbuf[i*2+1]);
@@ -117,11 +122,11 @@ int main(int argc, char* argv[])
   target[0] = 35 - (4%2);
   target[1] = +(4*10 + rank);
 
-  DTCMP_Search_local_low(target, outsatbuf, 0, size-1, MPI_INT, type_2int, DTCMP_OP_INT_DESCEND, &flag, &index);
+  DTCMP_Search_low_local(target, outsatbuf, 0, size-1, MPI_INT, type_2int, DTCMP_OP_INT_DESCEND, &flag, &index);
 //  DTCMP_Search_local_low(target, outsatbuf, 0, size-1, type_2int, type_2int, cmp_2int, &flag, &index);
   printf("%d: flag %d, index %d\n", rank, flag, index);
 
-  DTCMP_Search_local_high(target, outsatbuf, 0, size-1, MPI_INT, type_2int, DTCMP_OP_INT_DESCEND, &flag, &index);
+  DTCMP_Search_high_local(target, outsatbuf, 0, size-1, MPI_INT, type_2int, DTCMP_OP_INT_DESCEND, &flag, &index);
 //  DTCMP_Search_local_high(target, outsatbuf, 0, size-1, type_2int, type_2int, cmp_2int, &flag, &index);
   printf("%d: flag %d, index %d\n", rank, flag, index);
 

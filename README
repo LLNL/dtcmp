@@ -9,7 +9,7 @@ communicator including:
   merge  - combine multiple ordered lists into a single ordered list
   partition - divide a list of items into lower and higher values
               around a specified pivot value
-  select - identify the value having the kth largest value
+  select - identify the kth largest value
   sort - sort data items into an ordered list
   rank - assign group ids and ranks to a list of items
 
@@ -25,21 +25,25 @@ routines.  The generality provided by the DTCMP API that makes
 portability possible also tends to reduce performance in some respects,
 e.g., forcing memory copies, abstracting some details about datatype,
 etc.  Most likely a hand-tuned algorithm for the precise problem at
-hand will always beat DTCMP.  However, DTCMP should be fast, efficient,
-and portable, so it will generally be a good option except for those
-cases where the application bottleneck demands absolute performance.
+hand will always be faster than DTCMP.  However, DTCMP should be fast,
+efficient, and portable, so it will generally be a good option except
+for those cases where the application bottleneck demands absolute
+performance.
 
 Currently, only a few pre-defined comparison operations are provided.
-All pre-defined operations have the following naming convention:
+More will be added with time.  All pre-defined operations have the
+following naming convention:
 
   DTCMP_OP_<TYPE>_<DIRECTION>
 
 where <TYPE> may be one of
+
   INT    - C int
   FLOAT  - C float
   DOUBLE - C double
 
 and <DIRECTION> may be one of:
+
   ASCEND  - order values from smallest to largest
   DESCEND - order values from largest to smallest
 
@@ -52,34 +56,52 @@ specify the datatype for the key and another datatype for the key with
 its satellite data.  The first is often named "key" and the second
 "keysat".  The key datatype is used to infer the type and size of the
 key when comparing key values.  This can be exploited to select
-optimized comparison routines, e.g., radix sort on integers.  The
-keysat type is needed to copy items in memory or transfer an item
-between processes.
+optimized comparison routines, e.g., radix sort on integers, and it
+enables the library to siphon and only process the key component if
+needed.  The keysat type is needed to copy items in memory or transfer
+an item between processes.
 
-As an example, consider a problem in which each process in MPI_COMM_WORLD
-has 10 items consisting of an integer key and a integer satellite
-value.  One could use DTCMP to globally sort and redistribute these
-items across the communicator like so:
+As an example use case for DTCMP, consider a problem in which each
+process in MPI_COMM_WORLD has 10 items, each consisting of an integer
+key and a integer satellite value.  One could use DTCMP to globally
+sort and redistribute these items across the communicator like so:
 
   int inbuf[20] = {... 10 key/satellite pairs ...};
   int outbuf[20];
+
   MPI_Datatype keysat;
   MPI_Type_contiguous(2, MPI_INT, &keysat);
   MPI_Type_commit(&keysat);
+
   DTCMP_Sort(inbuf, outbuf, 10, MPI_INT, keysat,
     DTCMP_OP_INT_ASCEND, MPI_COMM_WORLD);
+
   MPI_Type_free(&keysat);
 
-At the end of this routine, outbuf on rank 0 will contain the first 10
-items, rank 1 will contain the next 10 items, rank 2 the next 10, and
-so on.
+Each process creates a datatype to describe the key with its satellite,
+which is the keysat type that consists of 2 consecutive integers.  Then
+each process calls DTCMP_Sort and provides a pointer to its input items
+(inbuf), a buffer to hold the output items (outbuf), the number of
+items (10) in the input buffer, the datatype of the key (MPI_INT),
+the datatype of the key together with its satellite data (keysat),
+the comparison operation (DTCMP_OP_INT_ASCEND -- a pre-defined op to
+sort integer keys in increasing order), and the communicator on which
+to execute the sort (MPI_COMM_WORLD).  The DTCMP_Sort routine is
+collective over the processes in the communicator.  Upon return from
+this routine, outbuf on rank 0 will contain the first 10 items, rank 1
+will contain the next 10 items, rank 2 the next 10, and so on.
+
+The DTCMP_Sort routine assumes that each process provides the same
+number of items for input.  If the number of input items varies across
+processes, one can use DTCMP_Sortv instead.
 
 In addition to the pre-defined comparison operations, DTCMP enables
-users to create user-defined operations, which may be arbitrary or they
-can be constructed by combining pre-defined ops.  For example, if each
-process has a compound key consisting of two ints which should be
-ordered lexicographically by first int in increasing order and then
-second int in decreasing order, one can create the following op:
+users to create user-defined operations.  DTCMP_Op_create_series allows
+one to create compound keys whose components are compared
+lexicographically in series.  For example, if each process has a
+compound key consisting of two ints which should be ordered with the
+first int in increasing order and then the second int in decreasing
+order, one can combine two pre-defined comparison operations like so:
 
   DTCMP_Op op;
   DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_DESCEND, &op);
@@ -88,9 +110,9 @@ second int in decreasing order, one can create the following op:
 
 This function will compare key values by the first comparison operation,
 and then by the second if the first is equal.  One can chain together
-multiple comparision operations in this way, and the type of each
-component may be different.  This enables one to create keys consisting
-of arbitrary tuples.
+an arbitrary number of comparision operations in this way, and the type
+of each component may be different.  This enables one to create keys
+consisting of arbitrary tuples.
 
 The comparison operation encodes an "extent" which is used to advance
 the pointer from one component to the next when the first comparison is
@@ -98,7 +120,9 @@ equal.  By default, this extent is the extent of the component type,
 but one can override this default with the DTCMP_Op_create_hseries
 routine, which takes a third parameter to specify the number of bytes
 and direction (plus or minus) to locate the next key component after
-the current one.
+the current one.  Encoding a negative extent in the comparison op
+enables one to jump backwards in case less-significant components come
+before more significant components.
 
 One can also create a new operation with DTCMP_Op_create, which takes a
 datatype to specify the key and a function pointer to be called to
@@ -118,6 +142,14 @@ Given such a function, one can create a new op like so:
   MPI_Datatype key; // datatype that describes key value
   DTCMP_Op op;
   DTCMP_Op_create(key, my_compare_op, &op);
+  ... use op ...
+  DTCMP_Op_free(&op);
+
+The operation encodes the key datatype, its extent, and a pointer to
+the comparison operation function.  Once a new operation has been
+created with DTCMP_Op_create, it can be used in any DTCMP routine and
+it can also be used as a component within a larger series.  DTCMP
+currently only supports fixed-length keys.
 
 Currently, key and keysat datatypes must adhere to a certain set of
 constraints.  Namely, they cannot have holes, lb=0, extent > 0,

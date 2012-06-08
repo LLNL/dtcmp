@@ -24,15 +24,16 @@ int DTCMP_Sort_allgather(
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &ranks);
 
-  if (ranks > 0) {
-    int total_count = count * ranks;
+  /* compute total number of items that we'll collect */
+  int total_count = count * ranks;
 
-    /* get true extent of keysat type */
-    MPI_Aint true_lb, true_extent;
-    MPI_Type_get_true_extent(keysat, &true_lb, &true_extent);
+  /* get true extent of keysat type */
+  MPI_Aint true_lb, true_extent;
+  MPI_Type_get_true_extent(keysat, &true_lb, &true_extent);
 
-    /* allocate space to hold all items from all procs */
-    size_t buf_size = total_count * true_extent;
+  /* allocate space to hold all items from all procs */
+  size_t buf_size = total_count * true_extent;
+  if (buf_size > 0) {
     char* buf = (char*) dtcmp_malloc(buf_size, 0, __FILE__, __LINE__); 
 
     /* gather all items, send from outbuf if IN_PLACE is specified */

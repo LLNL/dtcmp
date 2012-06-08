@@ -323,8 +323,8 @@ static int find_splitters(
       int start_index = index[i];
       int end_index   = index[i] + num[i] - 1;
       int flag, lowest, highest;
-      DTCMP_Search_local_low(target,  data, start_index, end_index, key, keysat, cmp, &flag, &lowest);
-      DTCMP_Search_local_high(target, data, lowest,      end_index, key, keysat, cmp, &flag, &highest);
+      DTCMP_Search_low_local(target,  data, start_index, end_index, key, keysat, cmp, &flag, &lowest);
+      DTCMP_Search_high_local(target, data, lowest,      end_index, key, keysat, cmp, &flag, &highest);
       counts[i*2+LT] = lowest - start_index;
       counts[i*2+EQ] = (highest + 1) - lowest;
     }
@@ -513,6 +513,9 @@ int DTCMP_Sortv_cheng(
    * all items equal to or less than should be sent to corresponding proc */
   void* splitters = dtcmp_malloc(group_ranks * key_true_extent, 0, __FILE__, __LINE__);
 
+  /* dummy array to hold flags in Search_low_list call */
+  int* flags = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+
   /* compute index in input buffer for each splitter */
   int* indicies = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
 
@@ -552,9 +555,9 @@ int DTCMP_Sortv_cheng(
   );
 
   /* search for index values for these split points in our local data */
-  DTCMP_Search_local_low_list(
+  DTCMP_Search_low_list_local(
     group_ranks, splitters, outbuf, 0, count-1,
-    key, keysat, cmp, indicies
+    key, keysat, cmp, flags, indicies
   );
 
   /* set our send counts */
@@ -616,6 +619,7 @@ int DTCMP_Sortv_cheng(
   /* free our scratch space */
   dtcmp_free(&splitters);
   dtcmp_free(&indicies);
+  dtcmp_free(&flags);
   dtcmp_free(&sendcounts);
   dtcmp_free(&recvcounts);
   dtcmp_free(&senddispls);

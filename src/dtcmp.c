@@ -29,6 +29,9 @@ MPI_Comm dtcmp_comm_self = MPI_COMM_NULL;
  * and this keeps track of the seed between calls */
 unsigned dtcmp_rand_seed = 0;
 
+/* set a NULL handle to be a NULL pointer */
+DTCMP_Handle DTCMP_HANDLE_NULL = NULL;
+
 /* define our NULL comparison handle */
 DTCMP_Op DTCMP_OP_NULL = NULL;
 
@@ -191,6 +194,26 @@ int DTCMP_Op_free(DTCMP_Op* cmp)
   }
 }
 
+/* free resources associated with handle, if any */
+int DTCMP_Free(DTCMP_Handle* handle)
+{
+  if (handle != NULL && *handle != DTCMP_HANDLE_NULL) {
+    DTCMP_Free_fn* fn = (DTCMP_Free_fn*)(*handle);
+    return (*fn)(handle);
+  }
+  return DTCMP_SUCCESS;
+}
+
+/* assumes that handle just points to one big block of memory that must be freed */
+int DTCMP_Free_single(DTCMP_Handle* handle)
+{
+  if (handle != NULL && *handle != DTCMP_HANDLE_NULL) {
+    free(*handle);
+    *handle = DTCMP_HANDLE_NULL;
+  }
+  return DTCMP_SUCCESS;
+}
+
 /* TODO: turn this into a macro */
 /* copy memory from srcbuf to dstbuf using committed MPI datatypes */
 int DTCMP_Memcpy(
@@ -207,7 +230,7 @@ int DTCMP_Memcpy(
   return DTCMP_SUCCESS;
 }
 
-int DTCMP_Search_local_low(
+int DTCMP_Search_low_local(
   const void* target,
   const void* list,
   int low,
@@ -229,10 +252,10 @@ int DTCMP_Search_local_low(
     return DTCMP_FAILURE;
   }
 
-  return DTCMP_Search_local_low_binary(target, list, low, high, key, keysat, cmp, flag, index);
+  return DTCMP_Search_low_local_binary(target, list, low, high, key, keysat, cmp, flag, index);
 }
 
-int DTCMP_Search_local_high(
+int DTCMP_Search_high_local(
   const void* target,
   const void* list,
   int low,
@@ -254,10 +277,10 @@ int DTCMP_Search_local_high(
     return DTCMP_FAILURE;
   }
 
-  return DTCMP_Search_local_high_binary(target, list, low, high, key, keysat, cmp, flag, index);
+  return DTCMP_Search_high_local_binary(target, list, low, high, key, keysat, cmp, flag, index);
 }
 
-int DTCMP_Search_local_low_list(
+int DTCMP_Search_low_list_local(
   int num,
   const void* targets,
   const void* list,
@@ -266,13 +289,14 @@ int DTCMP_Search_local_low_list(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  int* flags,
   int* indicies)
 {
   /* check parameters */
   if (num < 0) {
     return DTCMP_FAILURE;
   }
-  if (num > 0 && (targets == NULL || indicies == NULL)) {
+  if (num > 0 && (targets == NULL || flags == NULL || indicies == NULL)) {
     return DTCMP_FAILURE;
   }
   if (!dtcmp_type_is_valid(key)) {
@@ -282,7 +306,7 @@ int DTCMP_Search_local_low_list(
     return DTCMP_FAILURE;
   }
 
-  return DTCMP_Search_local_low_list_binary(num, targets, list, low, high, key, keysat, cmp, indicies);
+  return DTCMP_Search_low_list_local_binary(num, targets, list, low, high, key, keysat, cmp, flags, indicies);
 }
 
 int DTCMP_Partition_local(
@@ -527,6 +551,34 @@ int DTCMP_Sortv(
   /* if we have any elements, invoke the sortv routines */
   return DTCMP_Sortv_sortgather_scatter(inbuf, outbuf, count, key, keysat, cmp, comm);
   return DTCMP_Sortv_allgather(inbuf, outbuf, count, key, keysat, cmp, comm);
+}
+
+int DTCMP_Sortz(
+  const void* inbuf,
+  int count,
+  void** outbuf,
+  int* outcount,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  MPI_Comm comm, 
+  DTCMP_Handle* handle)
+{
+  /* check parameters */
+  if (count < 0) {
+    return DTCMP_FAILURE;
+  }
+  if (count > 0 && outbuf == NULL) {
+    return DTCMP_FAILURE;
+  }
+  if (!dtcmp_type_is_valid(key)) {
+    return DTCMP_FAILURE;
+  }
+  if (!dtcmp_type_is_valid(keysat)) {
+    return DTCMP_FAILURE;
+  }
+
+  return DTCMP_Sortz_samplesort(inbuf, count, outbuf, outcount, key, keysat, cmp, comm, handle);
 }
 
 int DTCMP_Rankv(

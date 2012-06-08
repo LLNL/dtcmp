@@ -256,46 +256,49 @@ int DTCMP_Sort_bitonic(
   MPI_Type_get_true_extent(keysat, &true_lb, &true_extent);
 
   /* allocate scratch space to hold data */
-  void* value = dtcmp_malloc(count * true_extent, 0, __FILE__, __LINE__);
-  void* extra = dtcmp_malloc(count * true_extent, 0, __FILE__, __LINE__);
-  void* merge = dtcmp_malloc(2 * count * true_extent, 0, __FILE__, __LINE__);
+  size_t buf_size = count * true_extent;
+  if (buf_size > 0) {
+    void* value = dtcmp_malloc(buf_size, 0, __FILE__, __LINE__);
+    void* extra = dtcmp_malloc(buf_size, 0, __FILE__, __LINE__);
+    void* merge = dtcmp_malloc(2 * buf_size, 0, __FILE__, __LINE__);
 
-  /* TODO: handle lower bound */
-  /* copy our input items into the value buffer */
-  void* buf = (void*) inbuf;
-  if (inbuf == DTCMP_IN_PLACE) {
-    buf = outbuf;
+    /* TODO: handle lower bound */
+    /* copy our input items into the value buffer */
+    void* buf = (void*) inbuf;
+    if (inbuf == DTCMP_IN_PLACE) {
+      buf = outbuf;
+    }
+    DTCMP_Memcpy(value, count, keysat, buf, count, keysat);
+
+    /* get our rank and the number of ranks in our communicator */
+    int rank, ranks;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &ranks);
+
+    /* conduct the bitonic sort */
+    if (count == 1) {
+      /* sort just a single element */
+      DTCMP_Sort_bitonic_sort_single(value, extra, keysat, cmp, rank, 0, ranks, 1, comm);
+    } else {
+      /* sort local elements first */
+      DTCMP_Sort_local(DTCMP_IN_PLACE, value, count, key, keysat, cmp);
+
+      /* now sort across processes */
+      DTCMP_Sort_bitonic_sort_multiple(
+        value, extra, merge, count, key, keysat, true_extent, cmp,
+        rank, 0, ranks, 1, comm
+      );
+    }
+
+    /* TODO: handle lower bound */
+    /* copy our sorted items into our output buffer */
+    DTCMP_Memcpy(outbuf, count, keysat, value, count, keysat);
+
+    /* free the scratch space */
+    dtcmp_free(&merge);
+    dtcmp_free(&extra);
+    dtcmp_free(&value);
   }
-  DTCMP_Memcpy(value, count, keysat, buf, count, keysat);
-
-  /* get our rank and the number of ranks in our communicator */
-  int rank, ranks;
-  MPI_Comm_rank(comm, &rank);
-  MPI_Comm_size(comm, &ranks);
-
-  /* conduct the bitonic sort */
-  if (count == 1) {
-    /* sort just a single element */
-    DTCMP_Sort_bitonic_sort_single(value, extra, keysat, cmp, rank, 0, ranks, 1, comm);
-  } else {
-    /* sort local elements first */
-    DTCMP_Sort_local(DTCMP_IN_PLACE, value, count, key, keysat, cmp);
-
-    /* now sort across processes */
-    DTCMP_Sort_bitonic_sort_multiple(
-      value, extra, merge, count, key, keysat, true_extent, cmp,
-      rank, 0, ranks, 1, comm
-    );
-  }
-
-  /* TODO: handle lower bound */
-  /* copy our sorted items into our output buffer */
-  DTCMP_Memcpy(outbuf, count, keysat, value, count, keysat);
-
-  /* free the scratch space */
-  dtcmp_free(&merge);
-  dtcmp_free(&extra);
-  dtcmp_free(&value);
 
   return rc;
 }

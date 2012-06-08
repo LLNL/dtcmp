@@ -49,11 +49,17 @@ extern unsigned dtcmp_rand_seed;
 void* dtcmp_malloc(size_t size, size_t alignment, const char* file, int line);
 void dtcmp_free(void*);
 
+/* function pointer to a DTCMP_Free implementation that takes a pointer to a handle */
+typedef int(*DTCMP_Free_fn)(DTCMP_Handle*);
+
+/* assumes that handle just points to one big block of memory that must be freed */
+int DTCMP_Free_single(DTCMP_Handle* handle);
+
 /* ---------------------------------------
  * Seach implementations
  * --------------------------------------- */
 
-int DTCMP_Search_local_low_binary(
+int DTCMP_Search_low_local_binary(
   const void* target,
   const void* list,
   int low,
@@ -65,7 +71,7 @@ int DTCMP_Search_local_low_binary(
   int* index
 );
 
-int DTCMP_Search_local_high_binary(
+int DTCMP_Search_high_local_binary(
   const void* target,
   const void* list,
   int low,
@@ -77,7 +83,7 @@ int DTCMP_Search_local_high_binary(
   int* index
 );
 
-int DTCMP_Search_local_low_list_binary(
+int DTCMP_Search_low_list_local_binary(
   int num,
   const void* targets,
   const void* list,
@@ -86,7 +92,8 @@ int DTCMP_Search_local_low_list_binary(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
-  int* indicies
+  int flags[],
+  int indicies[]
 );
 
 /* ---------------------------------------
@@ -278,6 +285,22 @@ int DTCMP_Sortv_cheng(
   int group_ranks,
   const int* comm_ranklist,
   MPI_Comm comm
+);
+
+/* ---------------------------------------
+ * Sortz implementations
+ * --------------------------------------- */
+
+int DTCMP_Sortz_samplesort(
+  const void* inbuf,
+  int count,
+  void** outbuf,
+  int* outcount,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  MPI_Comm comm,
+  DTCMP_Handle* handle
 );
 
 /* ---------------------------------------

@@ -92,5 +92,10 @@ int ranklist_allreduce_recursive(
     mask <<= 1;
   }
 
+  if (tmp != NULL) {
+    free(tmp);
+    tmp = NULL;
+  }
+
   return 0;
 }
