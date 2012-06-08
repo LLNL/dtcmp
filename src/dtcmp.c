@@ -25,6 +25,12 @@ const void* DTCMP_IN_PLACE = (const void*) &DTCMP_IN_PLACE_LOCATION;
 /* we'll dup comm_self during init, which we need for our memcpy */
 MPI_Comm dtcmp_comm_self = MPI_COMM_NULL;
 
+/* we create a type of 3 consecutive uint64_t for computing min/max/sum reduction */
+static MPI_Datatype dtcmp_type_3uint64t = MPI_DATATYPE_NULL;
+
+/* op for computing min/max/sum reduction */
+static MPI_Op dtcmp_reduceop_mms_3uint64t = MPI_OP_NULL;
+
 /* we call rand_r() to acquire random numbers,
  * and this keeps track of the seed between calls */
 unsigned dtcmp_rand_seed = 0;
@@ -84,11 +90,72 @@ static int dtcmp_type_is_valid(MPI_Datatype type)
   return 1;
 }
 
+/* user-defined reduction operation to compute min/max/sum */
+#define MMS_MIN (0)
+#define MMS_MAX (1)
+#define MMS_SUM (2)
+static void min_max_sum(void* invec, void* inoutvec, int* len, MPI_Datatype* type)
+{
+   uint64_t* a = (uint64_t*) invec;
+   uint64_t* b = (uint64_t*) inoutvec;
+
+   int i;
+   for (i = 0; i < *len; i++) {
+     /* compute minimum across all ranks */
+     if (a[MMS_MIN] < b[MMS_MIN]) {
+       b[MMS_MIN] = a[MMS_MIN];
+     }
+
+     /* compute maximum across all ranks */
+     if (a[MMS_MAX] > b[MMS_MAX]) {
+       b[MMS_MAX] = a[MMS_MAX];
+     }
+
+     /* compute sum across all ranks */
+     b[MMS_SUM] += a[MMS_SUM];
+
+     /* advance to next element */
+     a += 3;
+     b += 3;
+  }
+}
+
+/* execute reduction to compute min/max/sum over comm */
+static int get_min_max_sum(int count, uint64_t* min, uint64_t* max, uint64_t* sum, MPI_Comm comm)
+{
+  /* initialize our input with our count value */
+  uint64_t input[3];
+  input[MMS_MIN] = (uint64_t) count;
+  input[MMS_MAX] = (uint64_t) count;
+  input[MMS_SUM] = (uint64_t) count;
+
+  /* execute the allreduce */
+  uint64_t output[3];
+  MPI_Allreduce(input, output, 1, dtcmp_type_3uint64t, dtcmp_reduceop_mms_3uint64t, comm);
+
+  /* copy result to output parameters */
+  *min = output[MMS_MIN];
+  *max = output[MMS_MAX];
+  *sum = output[MMS_SUM];
+
+  return DTCMP_SUCCESS;
+}
+
 /* initialize the sorting library */
 int DTCMP_Init()
 {
   /* copy comm_self */
   MPI_Comm_dup(MPI_COMM_SELF, &dtcmp_comm_self);
+
+  /* set up a datatype for min/max/sum reduction */
+  MPI_Type_contiguous(3, MPI_UINT64_T, &dtcmp_type_3uint64t);
+  MPI_Type_commit(&dtcmp_type_3uint64t);
+
+  /* set up our user-defined op for min/max/sum reduction,
+   * just integer min/max/addition of non-negative values,
+   * so assume this is commutative */
+  int commutative = 1;
+  MPI_Op_create(min_max_sum, commutative, &dtcmp_reduceop_mms_3uint64t);
 
   /* setup predefined cmp handles */
   DTCMP_Op_create(MPI_INT, dtcmp_op_fn_int_ascend,  &DTCMP_OP_INT_ASCEND);
@@ -113,6 +180,16 @@ int DTCMP_Finalize()
   DTCMP_Op_free(&DTCMP_OP_INT_DESCEND);
   DTCMP_Op_free(&DTCMP_OP_INT_ASCEND);
 
+  if (dtcmp_reduceop_mms_3uint64t != MPI_OP_NULL) {
+    MPI_Op_free(&dtcmp_reduceop_mms_3uint64t);
+    dtcmp_reduceop_mms_3uint64t = MPI_OP_NULL;
+  }
+
+  if (dtcmp_type_3uint64t != MPI_DATATYPE_NULL) {
+    MPI_Type_free(&dtcmp_type_3uint64t);
+    dtcmp_type_3uint64t = MPI_DATATYPE_NULL;
+  }
+
   /* free our copy of comm_self */
   if (dtcmp_comm_self != MPI_COMM_NULL) {
     MPI_Comm_free(&dtcmp_comm_self);
@@ -127,6 +204,9 @@ int DTCMP_Finalize()
 int DTCMP_Op_create(MPI_Datatype key, DTCMP_Op_fn fn, DTCMP_Op* cmp)
 {
   /* check parameters */
+  if (! dtcmp_type_is_valid(key)) {
+    return DTCMP_FAILURE;
+  }
   if (cmp == NULL) {
     return DTCMP_FAILURE;
   }
@@ -245,10 +325,10 @@ int DTCMP_Search_low_local(
   if (target == NULL || flag == NULL || list == NULL) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(key)) {
+  if (! dtcmp_type_is_valid(key)) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(keysat)) {
+  if (! dtcmp_type_is_valid(keysat)) {
     return DTCMP_FAILURE;
   }
 
@@ -270,10 +350,10 @@ int DTCMP_Search_high_local(
   if (target == NULL || flag == NULL || list == NULL) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(key)) {
+  if (! dtcmp_type_is_valid(key)) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(keysat)) {
+  if (! dtcmp_type_is_valid(keysat)) {
     return DTCMP_FAILURE;
   }
 
@@ -289,8 +369,8 @@ int DTCMP_Search_low_list_local(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
-  int* flags,
-  int* indicies)
+  int flags[],
+  int indicies[])
 {
   /* check parameters */
   if (num < 0) {
@@ -299,10 +379,10 @@ int DTCMP_Search_low_list_local(
   if (num > 0 && (targets == NULL || flags == NULL || indicies == NULL)) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(key)) {
+  if (! dtcmp_type_is_valid(key)) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(keysat)) {
+  if (! dtcmp_type_is_valid(keysat)) {
     return DTCMP_FAILURE;
   }
 
@@ -325,10 +405,10 @@ int DTCMP_Partition_local(
   if (count > 0 && buf == NULL) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(key)) {
+  if (! dtcmp_type_is_valid(key)) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(keysat)) {
+  if (! dtcmp_type_is_valid(keysat)) {
     return DTCMP_FAILURE;
   }
 
@@ -354,10 +434,10 @@ int DTCMP_Merge_local(
   if (num > 0 && (inbufs == NULL || counts == NULL || outbuf == NULL)) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(key)) {
+  if (! dtcmp_type_is_valid(key)) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(keysat)) {
+  if (! dtcmp_type_is_valid(keysat)) {
     return DTCMP_FAILURE;
   }
 
@@ -389,10 +469,10 @@ int DTCMP_Select_local(
   if (k < 0 || k >= num) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(key)) {
+  if (! dtcmp_type_is_valid(key)) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(keysat)) {
+  if (! dtcmp_type_is_valid(keysat)) {
     return DTCMP_FAILURE;
   }
 
@@ -423,12 +503,14 @@ int DTCMP_Sort_local(
   if (count > 0 && outbuf == NULL) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(key)) {
+  if (! dtcmp_type_is_valid(key)) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(keysat)) {
+  if (! dtcmp_type_is_valid(keysat)) {
     return DTCMP_FAILURE;
   }
+
+  /* TODO: select algorithm based on number of elements */
 
   return DTCMP_Sort_local_randquicksort(inbuf, outbuf, count, key, keysat, cmp);
   return DTCMP_Sort_local_insertionsort(inbuf, outbuf, count, key, keysat, cmp);
@@ -457,43 +539,33 @@ int DTCMP_Sort(
   if (count > 0 && outbuf == NULL) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(key)) {
+  if (! dtcmp_type_is_valid(key)) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(keysat)) {
+  if (! dtcmp_type_is_valid(keysat)) {
     return DTCMP_FAILURE;
   }
+
+  /* if comm is a single rank, call sort_local */
+  int ranks;
+  MPI_Comm_size(comm, &ranks);
+  if (ranks < 2) {
+    return DTCMP_Sort_local(inbuf, outbuf, count, key, keysat, cmp);
+  }
+
+  /* execute allreduce to compute min/max counts per process,
+   * and sum of all elements */ 
+  uint64_t min, max, sum;
+  get_min_max_sum(count, &min, &max, &sum, comm);
+
+  /* nothing to do if the total element count is 0 */
+  if (sum == 0) {
+    return DTCMP_SUCCESS;
+  }
+
+  /* TODO: pick algorithm based on number of items */
 
   return DTCMP_Sort_allgather(inbuf, outbuf, count, key, keysat, cmp, comm);
-}
-
-#define MMS_MIN (0)
-#define MMS_MAX (1)
-#define MMS_SUM (2)
-static void min_max_sum(void* invec, void* inoutvec, int* len, MPI_Datatype* type)
-{
-   uint64_t* a = (uint64_t*) invec;
-   uint64_t* b = (uint64_t*) inoutvec;
-
-   int i;
-   for (i = 0; i < *len; i++) {
-     /* compute minimum across all ranks */
-     if (a[MMS_MIN] < b[MMS_MIN]) {
-       b[MMS_MIN] = a[MMS_MIN];
-     }
-
-     /* compute maximum across all ranks */
-     if (a[MMS_MAX] > b[MMS_MAX]) {
-       b[MMS_MAX] = a[MMS_MAX];
-     }
-
-     /* compute sum across all ranks */
-     b[MMS_SUM] += a[MMS_SUM];
-
-     /* advance to next element */
-     a += 3;
-     b += 3;
-  }
 }
 
 int DTCMP_Sortv(
@@ -512,41 +584,36 @@ int DTCMP_Sortv(
   if (count > 0 && outbuf == NULL) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(key)) {
+  if (! dtcmp_type_is_valid(key)) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(keysat)) {
+  if (! dtcmp_type_is_valid(keysat)) {
     return DTCMP_FAILURE;
   }
 
-  /* TODO: is uint64_t large enough for this count,
-   * need something that holds |int|^2? */
+  /* if comm is a single rank, call sort_local */
+  int ranks;
+  MPI_Comm_size(comm, &ranks);
+  if (ranks < 2) {
+    return DTCMP_Sort_local(inbuf, outbuf, count, key, keysat, cmp);
+  }
 
-  /* TODO: if comm is a single rank, call sort_local */
+  /* execute allreduce to compute min/max counts per process,
+   * and sum of all elements */ 
+  uint64_t min, max, sum;
+  get_min_max_sum(count, &min, &max, &sum, comm);
 
-  /* compute min/max/sum of counts across processes */
-  MPI_Datatype type_3uint64t;
-  MPI_Type_contiguous(3, MPI_UINT64_T, &type_3uint64t);
-  MPI_Type_commit(&type_3uint64t);
+  /* nothing to do if the total element count is 0 */
+  if (sum == 0) {
+    return DTCMP_SUCCESS;
+  }
 
-  /* just integer min/max/addition of non-negative values,
-   * so assume this is commutative */
-  MPI_Op op;
-  MPI_Op_create(min_max_sum, 1, &op);
+  /* if min==max, then just invoke Sort() routine */
+  if (min == max) {
+    return DTCMP_Sort(inbuf, outbuf, count, key, keysat, cmp, comm);
+  }
 
-  uint64_t reduce3[3];
-  reduce3[MMS_MIN] = count;
-  reduce3[MMS_MAX] = count;
-  reduce3[MMS_SUM] = count;
-  uint64_t allreduce[3];
-  MPI_Allreduce(reduce3, allreduce, 1, type_3uint64t, op, comm);
-
-  /* free our user-defined op and our type */
-  MPI_Op_free(&op);
-  MPI_Type_free(&type_3uint64t);
-
-  /* if min==max, then just invoke Sort() routine
-   * if sum(counts) is small gather to one task */
+  /* if sum(counts) is small gather to one task */
 
   /* if we have any elements, invoke the sortv routines */
   return DTCMP_Sortv_sortgather_scatter(inbuf, outbuf, count, key, keysat, cmp, comm);
@@ -568,13 +635,13 @@ int DTCMP_Sortz(
   if (count < 0) {
     return DTCMP_FAILURE;
   }
-  if (count > 0 && outbuf == NULL) {
+  if (outbuf == NULL || outcount == NULL) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(key)) {
+  if (! dtcmp_type_is_valid(key)) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(keysat)) {
+  if (! dtcmp_type_is_valid(keysat)) {
     return DTCMP_FAILURE;
   }
 
@@ -600,10 +667,10 @@ int DTCMP_Rankv(
   if (count > 0 && buf == NULL) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(key)) {
+  if (! dtcmp_type_is_valid(key)) {
     return DTCMP_FAILURE;
   }
-  if (!dtcmp_type_is_valid(keysat)) {
+  if (! dtcmp_type_is_valid(keysat)) {
     return DTCMP_FAILURE;
   }
 

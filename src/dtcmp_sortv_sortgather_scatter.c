@@ -314,7 +314,7 @@ int DTCMP_Sortv_sortgather_scatter(
       }
 
       /* parallel sort */
-      DTCMP_Sortv_cheng(
+      DTCMP_Sortv_ranklist_cheng(
         send_buf, recv_buf, (int)elem_count, key, keysat, cmp,
         sort_rank, sort_ranks, sort_group, comm
       );

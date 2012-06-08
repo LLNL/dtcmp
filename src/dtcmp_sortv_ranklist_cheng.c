@@ -485,7 +485,7 @@ static int find_splitters(
   return 0;
 }
 
-int DTCMP_Sortv_cheng(
+int DTCMP_Sortv_ranklist_cheng(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -494,7 +494,7 @@ int DTCMP_Sortv_cheng(
   DTCMP_Op cmp,
   int group_rank,
   int group_ranks,
-  const int* comm_ranklist,
+  const int comm_ranklist[],
   MPI_Comm comm)
 {
   int i;
