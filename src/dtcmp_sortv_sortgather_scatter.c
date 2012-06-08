@@ -47,13 +47,13 @@ int DTCMP_Sortv_sortgather_scatter(
   }
 
   /* get extent of keysat type */
-  MPI_Aint true_lb, true_extent;
-  MPI_Type_get_true_extent(keysat, &true_lb, &true_extent);
+  MPI_Aint keysat_true_lb, keysat_true_extent;
+  MPI_Type_get_true_extent(keysat, &keysat_true_lb, &keysat_true_extent);
 
   /* given extent of datatype and maximum amount of memory,
    * compute maximum number of elements we can hold */
   uint64_t max_mem = 100*1024*1024;
-//  int threshold = max_mem / true_extent;
+//  int threshold = max_mem / keysat_true_extent;
   uint64_t threshold = 3;
 
   /* determine the potential number of tasks we will communicate
@@ -207,7 +207,7 @@ int DTCMP_Sortv_sortgather_scatter(
   iter = 0;
   uint64_t elem_count = count;
   int block_size = 1;
-  while (iter < reduce[LEV]) {
+  while (iter < reduce[LEV]-1) {
     if (iter < send_iteration || send_iteration == -1) {
       elem_count += count_list[iter];
     }
@@ -216,9 +216,9 @@ int DTCMP_Sortv_sortgather_scatter(
   }
 
   /* declare pointers for temporary buffers to receive elements */
-  void* merge_buf = dtcmp_malloc(elem_count * true_extent, 0, __FILE__, __LINE__);
-  void* send_buf  = dtcmp_malloc(elem_count * true_extent, 0, __FILE__, __LINE__);
-  void* recv_buf  = dtcmp_malloc(elem_count * true_extent, 0, __FILE__, __LINE__);
+  void* merge_buf = dtcmp_malloc(elem_count * keysat_true_extent, 0, __FILE__, __LINE__);
+  void* send_buf  = dtcmp_malloc(elem_count * keysat_true_extent, 0, __FILE__, __LINE__);
+  void* recv_buf  = dtcmp_malloc(elem_count * keysat_true_extent, 0, __FILE__, __LINE__);
 
   /* copy our input data to send buffer buffer and sort it */
   char* buf = (void*) inbuf;
@@ -233,7 +233,7 @@ int DTCMP_Sortv_sortgather_scatter(
   iter = 0;
   int sent = 0;
   int send_count = count;
-  while (!sent && iter < reduce[LEV]) {
+  while (!sent && iter < reduce[LEV]-1) {
     /* determine whether we should send or receive in this round */
     int send = (iter == send_iteration);
     if (send) {
@@ -375,7 +375,7 @@ int DTCMP_Sortv_sortgather_scatter(
 
         /* determine our offset in the send buffer */
         final_count += send_count;
-        int final_offset = ((int)elem_count - final_count) * true_extent;
+        int final_offset = ((int)elem_count - final_count) * keysat_true_extent;
 
         /* send data and update our offset for the next send */
         if (send_count > 0) {

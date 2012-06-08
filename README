@@ -38,9 +38,11 @@ following naming convention:
 
 where <TYPE> may be one of
 
-  INT    - C int
-  FLOAT  - C float
-  DOUBLE - C double
+  INT     - C int
+  UINT32T - C uint32_t
+  UINT64T - C uint64_t
+  FLOAT   - C float
+  DOUBLE  - C double
 
 and <DIRECTION> may be one of:
 

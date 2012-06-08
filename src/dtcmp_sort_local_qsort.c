@@ -21,7 +21,7 @@ int DTCMP_Sort_local_qsort(
   DTCMP_Op cmp)
 {
   /* get a pointer to our comparison op struct */
-  DTCMP_Handle_t* c = (DTCMP_Handle_t*) cmp;
+  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) cmp;
 
   /* get extent of each item */
   MPI_Aint lb, extent;

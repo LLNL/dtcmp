@@ -9,6 +9,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include "mpi.h"
 #include "dtcmp_internal.h"
 
 /* malloc with some checks on size and the returned pointer, along with future support for alignment,
@@ -27,7 +28,7 @@ void* dtcmp_malloc(size_t size, size_t align, const char* file, int line)
 */
     ptr = malloc(size);
     if (ptr == NULL) {
-      printf("ERROR: Failed to allocate memory @ %s:%d\n", file, line);
+      printf("ERROR: Failed to allocate memory %lu bytes @ %s:%d\n", size, file, line);
       exit(1);
     }
   }
@@ -51,4 +52,69 @@ void dtcmp_free(void* p)
     free(*ptr);
     *ptr = NULL;
   }
+}
+
+int dtcmp_handle_alloc_single(size_t size, void** buf, DTCMP_Handle* handle)
+{
+  /* setup handle and buffer to merge data to return to user */
+  void* ret_buf = NULL;
+  size_t ret_buf_size = sizeof(dtcmp_handle_free_fn) + size;
+  if (ret_buf_size > 0) {
+    ret_buf = (void*) dtcmp_malloc(ret_buf_size, 0, __FILE__, __LINE__);
+    if (ret_buf == NULL) {
+      /* TODO: error */
+    }
+  }
+
+  /* compute and allocate space to merge received data */
+  char* ret_buf_tmp = (char*)ret_buf;
+  if (ret_buf != NULL) {
+    /* allocate and initialize function pointer as first item in handle struct */
+    dtcmp_handle_free_fn* fn = (dtcmp_handle_free_fn*) ret_buf;
+    *fn = dtcmp_handle_free_single;
+    ret_buf_tmp += sizeof(dtcmp_handle_free_fn);
+
+    /* record the start of the buffer */
+    if (size > 0) {
+      *buf = (void*) ret_buf_tmp;
+    } else {
+      *buf = NULL;
+    }
+  }
+
+  /* set the handle value */
+  *handle = ret_buf;
+
+  return DTCMP_SUCCESS;
+}
+
+/* assumes that handle just points to one big block of memory that must be freed */
+int dtcmp_handle_free_single(DTCMP_Handle* handle)
+{
+  if (handle != NULL && *handle != DTCMP_HANDLE_NULL) {
+    free(*handle);
+    *handle = DTCMP_HANDLE_NULL;
+  }
+  return DTCMP_SUCCESS;
+}
+
+/* execute reduction to compute min/max/sum over comm */
+int dtcmp_get_uint64t_min_max_sum(int count, uint64_t* min, uint64_t* max, uint64_t* sum, MPI_Comm comm)
+{
+  /* initialize our input with our count value */
+  uint64_t input[3];
+  input[MMS_MIN] = (uint64_t) count;
+  input[MMS_MAX] = (uint64_t) count;
+  input[MMS_SUM] = (uint64_t) count;
+
+  /* execute the allreduce */
+  uint64_t output[3];
+  MPI_Allreduce(input, output, 1, dtcmp_type_3uint64t, dtcmp_reduceop_mms_3uint64t, comm);
+
+  /* copy result to output parameters */
+  *min = output[MMS_MIN];
+  *max = output[MMS_MAX];
+  *sum = output[MMS_SUM];
+
+  return DTCMP_SUCCESS;
 }

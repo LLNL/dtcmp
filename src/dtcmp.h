@@ -80,6 +80,10 @@ extern DTCMP_Op DTCMP_OP_NULL;
 /* predefined comparison operations */
 extern DTCMP_Op DTCMP_OP_INT_ASCEND;
 extern DTCMP_Op DTCMP_OP_INT_DESCEND;
+extern DTCMP_Op DTCMP_OP_UINT32T_ASCEND;
+extern DTCMP_Op DTCMP_OP_UINT32T_DESCEND;
+extern DTCMP_Op DTCMP_OP_UINT64T_ASCEND;
+extern DTCMP_Op DTCMP_OP_UINT64T_DESCEND;
 extern DTCMP_Op DTCMP_OP_FLOAT_ASCEND;
 extern DTCMP_Op DTCMP_OP_FLOAT_DESCEND;
 extern DTCMP_Op DTCMP_OP_DOUBLE_ASCEND;
@@ -220,7 +224,7 @@ int DTCMP_Partition_local(
   void* buf,           /* INOUT - buffer holding elements to be partitioned */
   int count,           /* IN    - number of input items on the calling process (non-negative integer) */
   int inpivot,         /* IN    - index of pivot value within input values (non-negative integer) */
-  int* outpivot,       /* OUT   - position of pivot element after partitioning */
+  int* outpivot,       /* OUT   - position of pivot element after partitioning (non-negative integer) */
   MPI_Datatype key,    /* IN    - datatype of key (handle) */
   MPI_Datatype keysat, /* IN    - datatype of key and satellite (handle) */
   DTCMP_Op cmp         /* IN    - key comparison function (handle) */
@@ -233,12 +237,12 @@ int DTCMP_Partition_local(
 /* merge num ordered lists pointed to by inbufs into
  * a single ordered list in outbuf */
 int DTCMP_Merge_local(
-  int num,              /* IN  - number of input buffers (integer) */
+  int num,              /* IN  - number of input buffers (non-negative integer) */
   const void* inbufs[], /* IN  - start of each input buffer (array of length num) */ 
-  int counts[],         /* IN  - number of items in each buffer (array of length num) */
+  int counts[],         /* IN  - number of items in each buffer (array of non-negative integers of length num) */
   void* outbuf,         /* OUT - output buffer (large enough to hold sum of counts) */
-  MPI_Datatype key,     /* IN  - datatype of key */
-  MPI_Datatype keysat,  /* IN  - datatype of key and satellite */
+  MPI_Datatype key,     /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat,  /* IN  - datatype of key and satellite (handle) */
   DTCMP_Op cmp          /* IN  - key comparison function (handle) */
 );
 
@@ -251,8 +255,8 @@ int DTCMP_Merge_local(
 int DTCMP_Select_local(
   const void* buf,     /* IN  - buffer holding elements in which kth item is to be identified */
   int count,           /* IN  - number of input items on the calling process (non-negative integer) */
-  int k,               /* IN  - rank of item to identify from 0 to (count-1) */
-  void* item,          /* OUT - copy of kth largest key */
+  int k,               /* IN  - rank of item to identify in range from 0 to (count-1) inclusive */
+  void* item,          /* OUT - buffer to hold copy of kth largest key */
   MPI_Datatype key,    /* IN  - datatype of key (handle) */
   MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
   DTCMP_Op cmp         /* IN  - key comparison function (handle) */
@@ -268,9 +272,9 @@ int DTCMP_Sort_local(
   const void* inbuf,   /* IN  - start of buffer containing input key/satellite items */
   void* outbuf,        /* OUT - start of buffer to hold output key/satellite items after sort */
   int count,           /* IN  - number of input items on the calling process (non-negative integer) */
-  MPI_Datatype key,    /* IN  - datatype to use to compare items (handle) */
-  MPI_Datatype keysat, /* IN  - datatype containing key and satellite used to copy/transfer items (handle) */
-  DTCMP_Op cmp         /* IN  - comparison operation (handle) */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
+  DTCMP_Op cmp         /* IN  - key comparison operation (handle) */
 );
 
 /* all processes contribute the same number of elements to the sort,
@@ -279,9 +283,9 @@ int DTCMP_Sort(
   const void* inbuf,   /* IN  - start of buffer containing input key/satellite items */
   void* outbuf,        /* OUT - start of buffer to hold output key/satellite items after sort */
   int count,           /* IN  - number of input items on the calling process (non-negative integer) */
-  MPI_Datatype key,    /* IN  - datatype to use to compare items (handle) */
-  MPI_Datatype keysat, /* IN  - datatype containing key and satellite used to copy/transfer items (handle) */
-  DTCMP_Op cmp,        /* IN  - comparison operation (handle) */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
   MPI_Comm comm        /* IN  - communicator on which to execute sort (handle) */
 );
 
@@ -291,31 +295,37 @@ int DTCMP_Sortv(
   const void* inbuf,   /* IN  - start of buffer containing input key/satellite items */
   void* outbuf,        /* OUT - start of buffer to hold output key/satellite items after sort */
   int count,           /* IN  - number of input items on the calling process (non-negative integer) */
-  MPI_Datatype key,    /* IN  - datatype to use to compare items (handle) */
-  MPI_Datatype keysat, /* IN  - datatype containing key and satellite used to copy/transfer items (handle) */
-  DTCMP_Op cmp,        /* IN  - comparison operation (handle) */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
   MPI_Comm comm        /* IN  - communicator on which to execute sort (handle) */
 );
 
+/* each process may specify zero or more elements in inbuf to be sorted give by count,
+ * and function allocates and returns memory to hold output data, fills outbuf with
+ * pointer to this buffer, fills outcount with the number of elements in outbuf,
+ * and returns a handle which refers to the memory associated with outbuf, this
+ * handle must be freed with a call to DTCMP_Free when the called is done accessing
+ * outbuf */
 int DTCMP_Sortz(
   const void* inbuf,   /* IN  - start of buffer containing input key/satellite items */
   int count,           /* IN  - number of input items on the calling process (non-negative integer) */
   void** outbuf,       /* OUT - start of buffer to hold output key/satellite items after sort */
   int* outcount,       /* OUT - number of items in output buffer (non-negative integer) */
-  MPI_Datatype key,    /* IN  - datatype to use to compare items (handle) */
-  MPI_Datatype keysat, /* IN  - datatype containing key and satellite used to copy/transfer items (handle) */
-  DTCMP_Op cmp,        /* IN  - comparison operation (handle) */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
   MPI_Comm comm,       /* IN  - communicator on which to execute sort (handle) */
-  DTCMP_Handle* handle /* OUT - handle to resources allocated during call (handle) */
+  DTCMP_Handle* handle /* OUT - handle to resources associated with outbuf (handle) */
 );
 
 /* check whether all items in buf are already in sorted order */
 int DTCMP_Is_sorted(
   const void* buf,     /* IN  - start of buffer containing input key/satellite items */
   int count,           /* IN  - number of input items on the calling process (non-negative integer) */
-  MPI_Datatype key,    /* IN  - datatype to use to compare items (handle) */
-  MPI_Datatype keysat, /* IN  - datatype containing key and satellite used to copy/transfer items (handle) */
-  DTCMP_Op cmp,        /* IN  - comparison operation (handle) */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
   MPI_Comm comm,       /* IN  - communicator on which to execute sort (handle) */
   int* flag            /* OUT - flag is set to 1 if items are in sorted order, 0 otherwise (integer) */
 );
@@ -338,9 +348,9 @@ int DTCMP_Rankv(
   int  group_id[],     /* OUT - group identifier corresponding to each input item (array of non-negative integer of length count) */
   int  group_ranks[],  /* OUT - number of items within group of each input item (array of non-negative integers of length count) */
   int  group_rank[],   /* OUT - rank of each input item within its group (array of non-negative integers of length count) */
-  MPI_Datatype key,    /* IN  - datatype to use to compare items (handle) */
-  MPI_Datatype keysat, /* IN  - datatype containing key and satellite used to copy/transfer items (handle) */
-  DTCMP_Op cmp,        /* IN  - comparison operation (handle) */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
   MPI_Comm comm        /* IN  - communicator on which to execute sort (handle) */
 );
 

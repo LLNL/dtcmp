@@ -29,7 +29,7 @@ typedef struct {
   DTCMP_Op_fn fn;   /* comparison function pointer */
   MPI_Aint disp;    /* byte displacement from current pointer to start of next type */
   DTCMP_Op series;  /* second comparison handle to be applied if first evaluates to equal */
-} DTCMP_Handle_t;
+} dtcmp_op_handle_t;
 
 /* ---------------------------------------
  * Globals
@@ -37,6 +37,12 @@ typedef struct {
 
 /* dup of MPI_COMM_SELF that we need for DTCMP_Memcpy */
 extern MPI_Comm dtcmp_comm_self;
+
+/* we create a type of 3 consecutive uint64_t for computing min/max/sum reduction */
+extern MPI_Datatype dtcmp_type_3uint64t;
+
+/* op for computing min/max/sum reduction */
+extern MPI_Op dtcmp_reduceop_mms_3uint64t;
 
 /* we call rand_r() to acquire random numbers,
  * and this keeps track of the seed between calls */
@@ -50,10 +56,21 @@ void* dtcmp_malloc(size_t size, size_t alignment, const char* file, int line);
 void dtcmp_free(void*);
 
 /* function pointer to a DTCMP_Free implementation that takes a pointer to a handle */
-typedef int(*DTCMP_Free_fn)(DTCMP_Handle*);
+typedef int(*dtcmp_handle_free_fn)(DTCMP_Handle*);
+
+/* allocate a handle object of specified size and set it up to be freed
+ * with dtcmp_handle_free_single, return pointer to start of buffer and set
+ * handle value */
+int dtcmp_handle_alloc_single(size_t size, void** buf, DTCMP_Handle* handle);
 
 /* assumes that handle just points to one big block of memory that must be freed */
-int DTCMP_Free_single(DTCMP_Handle* handle);
+int dtcmp_handle_free_single(DTCMP_Handle* handle);
+
+/* user-defined reduction operation to compute min/max/sum */
+#define MMS_MIN (0)
+#define MMS_MAX (1)
+#define MMS_SUM (2)
+int dtcmp_get_uint64t_min_max_sum(int count, uint64_t* min, uint64_t* max, uint64_t* sum, MPI_Comm comm);
 
 /* ---------------------------------------
  * Seach implementations

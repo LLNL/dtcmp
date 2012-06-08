@@ -41,49 +41,55 @@ static int find_splitters(
 
   /* pick "s" regularly spaced samples */
   size_t samples_size = s * key_true_extent;
-  char* samples = (char*) dtcmp_malloc(samples_size, 0, __FILE__, __LINE__);
-  for (i = 0; i < s; i++) {
-    int sample_index = (((i+1) * count) / s) - 1;
-    char* src = buf + sample_index * keysat_extent;
-    char* dst = samples + i * key_extent;
-    DTCMP_Memcpy(dst, 1, key, src, 1, key);
-  }
-
-  /* gather samples to root */
-  int num_all_samples = ranks * s;
-  size_t all_samples_size = num_all_samples * key_true_extent;
-  char* all_samples = NULL;
-  if (rank == 0) {
-    all_samples = (char*) dtcmp_malloc(all_samples_size, 0, __FILE__, __LINE__);
-  }
-  MPI_Gather(samples, s, key, all_samples, s, key, 0, comm);
-
-  /* TODO: we could replace this with a merge since they are already
-   * ordered from each process, or replace this with a sorting
-   * gather */
-  /* sort samples at root */
-  if (rank == 0) {
-    DTCMP_Sort_local(DTCMP_IN_PLACE, all_samples, num_all_samples, key, key, cmp);
-  }
-
-  /* pick ranks-1 splitters */
-  int num_splitters = ranks - 1;
-  if (rank == 0) {
-    /* first splitter is s units in */
-    for (i = 0; i < num_splitters; i++) {
-      int splitter_index = (i+1) * s;
-      char* src = all_samples + splitter_index * key_extent;
-      char* dst = splitters + i * key_extent;
+  if (samples_size > 0) {
+    char* samples = (char*) dtcmp_malloc(samples_size, 0, __FILE__, __LINE__);
+    for (i = 0; i < s; i++) {
+      int sample_index = (((i+1) * count) / s) - 1;
+      char* src = buf + sample_index * keysat_extent;
+      char* dst = samples + i * key_extent;
       DTCMP_Memcpy(dst, 1, key, src, 1, key);
     }
+
+    /* gather samples to root */
+    int num_all_samples = ranks * s;
+    size_t all_samples_size = num_all_samples * key_true_extent;
+    if (all_samples_size > 0) {
+      char* all_samples = NULL;
+      if (rank == 0) {
+        all_samples = (char*) dtcmp_malloc(all_samples_size, 0, __FILE__, __LINE__);
+      }
+      MPI_Gather(samples, s, key, all_samples, s, key, 0, comm);
+
+      /* TODO: we could replace this with a merge since they are already
+       * ordered from each process, or replace this with a sorting
+       * gather */
+      /* sort samples at root */
+      if (rank == 0) {
+        DTCMP_Sort_local(DTCMP_IN_PLACE, all_samples, num_all_samples, key, key, cmp);
+      }
+
+      /* pick ranks-1 splitters */
+      int num_splitters = ranks - 1;
+      if (rank == 0) {
+        /* first splitter is s units in */
+        for (i = 0; i < num_splitters; i++) {
+          int splitter_index = (i+1) * s;
+          char* src = all_samples + splitter_index * key_extent;
+          char* dst = splitters + i * key_extent;
+          DTCMP_Memcpy(dst, 1, key, src, 1, key);
+        }
+      }
+
+      /* broadcast splitters to all procs */
+      MPI_Bcast(splitters, num_splitters, key, 0, comm);
+
+      /* free memory */
+      dtcmp_free(&all_samples);
+    }
+
+    /* free memory */
+    dtcmp_free(&samples);
   }
-
-  /* broadcast splitters to all procs */
-  MPI_Bcast(splitters, num_splitters, key, 0, comm);
-
-  /* free memory */
-  dtcmp_free(&all_samples);
-  dtcmp_free(&samples);
 
   return DTCMP_SUCCESS;
 }
@@ -169,27 +175,8 @@ static int split_exchange_merge(
   );
 
   /* setup handle and buffer to merge data to return to user */
-  void* ret_buf = NULL;
-  int ret_buf_size = sizeof(DTCMP_Free_fn) + incoming_bytes;
-  if (ret_buf_size > 0) {
-    ret_buf = (void*) dtcmp_malloc(ret_buf_size, 0, __FILE__, __LINE__);
-    if (ret_buf == NULL) {
-      /* TODO: error */
-    }
-  }
-
-  /* compute and allocate space to merge received data */
-  char* ret_buf_tmp = (char*)ret_buf;
-  void* merge_buf = NULL;
-  if (ret_buf != NULL) {
-    /* allocate and initialize function pointer as first item in handle struct */
-    DTCMP_Free_fn* fn = (DTCMP_Free_fn*) ret_buf;
-    *fn = DTCMP_Free_single;
-    ret_buf_tmp += sizeof(DTCMP_Free_fn);
-
-    merge_buf = (void*) ret_buf_tmp;
-    ret_buf_tmp += incoming_bytes;
-  }
+  void* merge_buf;
+  dtcmp_handle_alloc_single(incoming_bytes, &merge_buf, handle);
 
   /* merge p sorted lists */
   size_t inbufs_size = ranks * sizeof(void*);
@@ -209,10 +196,9 @@ static int split_exchange_merge(
   dtcmp_free(&indicies);
   dtcmp_free(&flags);
 
-  /* set return parameters */
+  /* set remaining return parameters */
   *outbuf   = merge_buf;
   *outcount = total_incoming;
-  *handle   = ret_buf;
 
   return DTCMP_SUCCESS;
 }
@@ -229,6 +215,25 @@ int DTCMP_Sortz_samplesort(
   MPI_Comm comm,
   DTCMP_Handle* handle)
 {
+  /* right now, this only supports calls where sum > 0 and min == max */
+  uint64_t min, max, sum;
+  dtcmp_get_uint64t_min_max_sum(incount, &min, &max, &sum, comm);
+
+  /* nothing to do if the total element count is 0 */
+  if (sum == 0) {
+    dtcmp_handle_alloc_single(0, outbuf, handle);
+    *outcount = 0;
+    return DTCMP_SUCCESS;
+  }
+
+  /* can't handle case where min != max */
+  if (min != max) {
+    *outbuf = NULL;
+    *outcount = 0;
+    *handle = DTCMP_HANDLE_NULL;
+    return DTCMP_FAILURE;
+  }
+
   /* TODO: compute appropriate s value */
   /* s = min(incount, 12*ceil(log(incount))) */
   int log_count = 0;
@@ -240,6 +245,9 @@ int DTCMP_Sortz_samplesort(
   int s = 12 * log_count;
   if (s > incount) {
     s = incount;
+  }
+  if (s == 0 && incount > 0) {
+    s = 1;
   }
 
   /* get my rank and number of ranks in comm */
@@ -254,6 +262,10 @@ int DTCMP_Sortz_samplesort(
   /* get lower bound and extent of keysat */
   MPI_Aint keysat_true_lb, keysat_true_extent;
   MPI_Type_get_true_extent(keysat, &keysat_true_lb, &keysat_true_extent);
+
+  /* TODO: as algorithm is currently written, we need to force elements
+   * to be unique, otherwise, we need to put some prefix sums in place
+   * to determine to which rank each rank should send its data */
 
   /* copy input data to a temporary buffer */
   size_t tmpbuf_size = incount * keysat_true_extent;

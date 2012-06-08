@@ -26,10 +26,10 @@ const void* DTCMP_IN_PLACE = (const void*) &DTCMP_IN_PLACE_LOCATION;
 MPI_Comm dtcmp_comm_self = MPI_COMM_NULL;
 
 /* we create a type of 3 consecutive uint64_t for computing min/max/sum reduction */
-static MPI_Datatype dtcmp_type_3uint64t = MPI_DATATYPE_NULL;
+MPI_Datatype dtcmp_type_3uint64t = MPI_DATATYPE_NULL;
 
 /* op for computing min/max/sum reduction */
-static MPI_Op dtcmp_reduceop_mms_3uint64t = MPI_OP_NULL;
+MPI_Op dtcmp_reduceop_mms_3uint64t = MPI_OP_NULL;
 
 /* we call rand_r() to acquire random numbers,
  * and this keeps track of the seed between calls */
@@ -45,6 +45,10 @@ DTCMP_Op DTCMP_OP_NULL = NULL;
  * we'll fill these in during init */
 DTCMP_Op DTCMP_OP_INT_ASCEND  = NULL;
 DTCMP_Op DTCMP_OP_INT_DESCEND = NULL;
+DTCMP_Op DTCMP_OP_UINT32T_ASCEND  = NULL;
+DTCMP_Op DTCMP_OP_UINT32T_DESCEND = NULL;
+DTCMP_Op DTCMP_OP_UINT64T_ASCEND  = NULL;
+DTCMP_Op DTCMP_OP_UINT64T_DESCEND = NULL;
 DTCMP_Op DTCMP_OP_FLOAT_ASCEND  = NULL;
 DTCMP_Op DTCMP_OP_FLOAT_DESCEND = NULL;
 DTCMP_Op DTCMP_OP_DOUBLE_ASCEND  = NULL;
@@ -91,10 +95,7 @@ static int dtcmp_type_is_valid(MPI_Datatype type)
 }
 
 /* user-defined reduction operation to compute min/max/sum */
-#define MMS_MIN (0)
-#define MMS_MAX (1)
-#define MMS_SUM (2)
-static void min_max_sum(void* invec, void* inoutvec, int* len, MPI_Datatype* type)
+static void dtcmp_reducefn_uint64t_min_max_sum(void* invec, void* inoutvec, int* len, MPI_Datatype* type)
 {
    uint64_t* a = (uint64_t*) invec;
    uint64_t* b = (uint64_t*) inoutvec;
@@ -120,27 +121,6 @@ static void min_max_sum(void* invec, void* inoutvec, int* len, MPI_Datatype* typ
   }
 }
 
-/* execute reduction to compute min/max/sum over comm */
-static int get_min_max_sum(int count, uint64_t* min, uint64_t* max, uint64_t* sum, MPI_Comm comm)
-{
-  /* initialize our input with our count value */
-  uint64_t input[3];
-  input[MMS_MIN] = (uint64_t) count;
-  input[MMS_MAX] = (uint64_t) count;
-  input[MMS_SUM] = (uint64_t) count;
-
-  /* execute the allreduce */
-  uint64_t output[3];
-  MPI_Allreduce(input, output, 1, dtcmp_type_3uint64t, dtcmp_reduceop_mms_3uint64t, comm);
-
-  /* copy result to output parameters */
-  *min = output[MMS_MIN];
-  *max = output[MMS_MAX];
-  *sum = output[MMS_SUM];
-
-  return DTCMP_SUCCESS;
-}
-
 /* initialize the sorting library */
 int DTCMP_Init()
 {
@@ -155,11 +135,15 @@ int DTCMP_Init()
    * just integer min/max/addition of non-negative values,
    * so assume this is commutative */
   int commutative = 1;
-  MPI_Op_create(min_max_sum, commutative, &dtcmp_reduceop_mms_3uint64t);
+  MPI_Op_create(dtcmp_reducefn_uint64t_min_max_sum, commutative, &dtcmp_reduceop_mms_3uint64t);
 
   /* setup predefined cmp handles */
   DTCMP_Op_create(MPI_INT, dtcmp_op_fn_int_ascend,  &DTCMP_OP_INT_ASCEND);
   DTCMP_Op_create(MPI_INT, dtcmp_op_fn_int_descend, &DTCMP_OP_INT_DESCEND);
+  DTCMP_Op_create(MPI_UINT32_T, dtcmp_op_fn_uint32t_ascend,  &DTCMP_OP_UINT32T_ASCEND);
+  DTCMP_Op_create(MPI_UINT32_T, dtcmp_op_fn_uint32t_descend, &DTCMP_OP_UINT32T_DESCEND);
+  DTCMP_Op_create(MPI_UINT64_T, dtcmp_op_fn_uint64t_ascend,  &DTCMP_OP_UINT64T_ASCEND);
+  DTCMP_Op_create(MPI_UINT64_T, dtcmp_op_fn_uint64t_descend, &DTCMP_OP_UINT64T_DESCEND);
   DTCMP_Op_create(MPI_FLOAT, dtcmp_op_fn_float_ascend,  &DTCMP_OP_FLOAT_ASCEND);
   DTCMP_Op_create(MPI_FLOAT, dtcmp_op_fn_float_descend, &DTCMP_OP_FLOAT_DESCEND);
   DTCMP_Op_create(MPI_DOUBLE, dtcmp_op_fn_double_ascend,  &DTCMP_OP_DOUBLE_ASCEND);
@@ -177,6 +161,10 @@ int DTCMP_Finalize()
   DTCMP_Op_free(&DTCMP_OP_DOUBLE_ASCEND);
   DTCMP_Op_free(&DTCMP_OP_FLOAT_DESCEND);
   DTCMP_Op_free(&DTCMP_OP_FLOAT_ASCEND);
+  DTCMP_Op_free(&DTCMP_OP_UINT64T_DESCEND);
+  DTCMP_Op_free(&DTCMP_OP_UINT64T_ASCEND);
+  DTCMP_Op_free(&DTCMP_OP_UINT32T_DESCEND);
+  DTCMP_Op_free(&DTCMP_OP_UINT32T_ASCEND);
   DTCMP_Op_free(&DTCMP_OP_INT_DESCEND);
   DTCMP_Op_free(&DTCMP_OP_INT_ASCEND);
 
@@ -231,7 +219,7 @@ int DTCMP_Op_create_series(DTCMP_Op first, DTCMP_Op second, DTCMP_Op* cmp)
   dtcmp_op_copy(&copy, second);
 
   /* now build a new comparison type using the key and fn of the first and add in second */
-  DTCMP_Handle_t* c = (DTCMP_Handle_t*) first;
+  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) first;
   dtcmp_op_init(DTCMP_OP_TYPE_SERIES, c->key, c->fn, copy, cmp);
 
   return DTCMP_SUCCESS;
@@ -251,7 +239,7 @@ int DTCMP_Op_create_hseries(DTCMP_Op first, MPI_Aint disp, DTCMP_Op second, DTCM
   dtcmp_op_copy(&copy, second);
 
   /* now build a new comparison type using the key and fn of the first and add in second */
-  DTCMP_Handle_t* c = (DTCMP_Handle_t*) first;
+  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) first;
   dtcmp_op_hinit(DTCMP_OP_TYPE_SERIES, c->key, c->fn, disp, copy, cmp);
 
   return DTCMP_SUCCESS;
@@ -261,7 +249,7 @@ int DTCMP_Op_create_hseries(DTCMP_Op first, MPI_Aint disp, DTCMP_Op second, DTCM
 int DTCMP_Op_free(DTCMP_Op* cmp)
 {
   if (cmp != NULL && *cmp != DTCMP_OP_NULL) {
-    DTCMP_Handle_t* c = (DTCMP_Handle_t*)(*cmp);
+    dtcmp_op_handle_t* c = (dtcmp_op_handle_t*)(*cmp);
     MPI_Type_free(&(c->key));
     if (c->series != DTCMP_OP_NULL) {
       DTCMP_Op_free(&(c->series));
@@ -278,18 +266,8 @@ int DTCMP_Op_free(DTCMP_Op* cmp)
 int DTCMP_Free(DTCMP_Handle* handle)
 {
   if (handle != NULL && *handle != DTCMP_HANDLE_NULL) {
-    DTCMP_Free_fn* fn = (DTCMP_Free_fn*)(*handle);
+    dtcmp_handle_free_fn* fn = (dtcmp_handle_free_fn*)(*handle);
     return (*fn)(handle);
-  }
-  return DTCMP_SUCCESS;
-}
-
-/* assumes that handle just points to one big block of memory that must be freed */
-int DTCMP_Free_single(DTCMP_Handle* handle)
-{
-  if (handle != NULL && *handle != DTCMP_HANDLE_NULL) {
-    free(*handle);
-    *handle = DTCMP_HANDLE_NULL;
   }
   return DTCMP_SUCCESS;
 }
@@ -517,7 +495,7 @@ int DTCMP_Sort_local(
   return DTCMP_Sort_local_mergesort(inbuf, outbuf, count, key, keysat, cmp);
 
   /* if keysat is valid type and if function is basic, we can just call qsort */
-  DTCMP_Handle_t* c = (DTCMP_Handle_t*) cmp;
+  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) cmp;
   if (c->type == DTCMP_OP_TYPE_BASIC) {
     return DTCMP_Sort_local_qsort(inbuf, outbuf, count, key, keysat, cmp);
   }
@@ -556,7 +534,7 @@ int DTCMP_Sort(
   /* execute allreduce to compute min/max counts per process,
    * and sum of all elements */ 
   uint64_t min, max, sum;
-  get_min_max_sum(count, &min, &max, &sum, comm);
+  dtcmp_get_uint64t_min_max_sum(count, &min, &max, &sum, comm);
 
   /* nothing to do if the total element count is 0 */
   if (sum == 0) {
@@ -601,7 +579,7 @@ int DTCMP_Sortv(
   /* execute allreduce to compute min/max counts per process,
    * and sum of all elements */ 
   uint64_t min, max, sum;
-  get_min_max_sum(count, &min, &max, &sum, comm);
+  dtcmp_get_uint64t_min_max_sum(count, &min, &max, &sum, comm);
 
   /* nothing to do if the total element count is 0 */
   if (sum == 0) {
@@ -645,7 +623,34 @@ int DTCMP_Sortz(
     return DTCMP_FAILURE;
   }
 
-  return DTCMP_Sortz_samplesort(inbuf, count, outbuf, outcount, key, keysat, cmp, comm, handle);
+  /* execute allreduce to compute min/max counts per process,
+   * and sum of all elements */ 
+  uint64_t min, max, sum;
+  dtcmp_get_uint64t_min_max_sum(count, &min, &max, &sum, comm);
+
+  /* nothing to do if the total element count is 0 */
+  if (sum == 0) {
+    dtcmp_handle_alloc_single(0, outbuf, handle);
+    *outcount = 0;
+    return DTCMP_SUCCESS;
+  }
+
+  /* for now, we can only use sample sort if min==max */
+  if (min == max) {
+    /* TODO: if number of elements per process is small, call bitonic sort */
+    return DTCMP_Sortz_samplesort(inbuf, count, outbuf, outcount, key, keysat, cmp, comm, handle);
+  }
+
+  /* otherwise, force things into a Sortv but where we allocate and
+   * return memory with a handle */
+  MPI_Aint keysat_true_lb, keysat_true_extent;
+  MPI_Type_get_true_extent(keysat, &keysat_true_lb, &keysat_true_extent);
+  size_t outbuf_size = count * keysat_true_extent;
+  dtcmp_handle_alloc_single(outbuf_size, outbuf, handle);
+  DTCMP_Sortv(inbuf, outbuf, count, key, keysat, cmp, comm);
+  *outcount = count;
+
+  return DTCMP_FAILURE;
 }
 
 int DTCMP_Rankv(

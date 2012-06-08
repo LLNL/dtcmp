@@ -20,7 +20,7 @@ void dtcmp_op_hinit(
   DTCMP_Op series,
   DTCMP_Op* cmp)
 {
-  DTCMP_Handle_t* c = (DTCMP_Handle_t*) malloc(sizeof(DTCMP_Handle_t));
+  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) malloc(sizeof(dtcmp_op_handle_t));
   if (c != NULL) {
     c->magic  = 1;
     c->type   = type;
@@ -51,7 +51,7 @@ void dtcmp_op_init(
 /* make a copy of src operation and save in dst */
 void dtcmp_op_copy(DTCMP_Op* dst, DTCMP_Op src)
 {
-  DTCMP_Handle_t* s = (DTCMP_Handle_t*) src;
+  dtcmp_op_handle_t* s = (dtcmp_op_handle_t*) src;
   if (s->series == DTCMP_OP_NULL) {
     dtcmp_op_hinit(s->type, s->key, s->fn, s->disp, s->series, dst);
   } else {
@@ -64,7 +64,7 @@ void dtcmp_op_copy(DTCMP_Op* dst, DTCMP_Op src)
 int dtcmp_op_eval(const void* a, const void* b, DTCMP_Op cmp)
 {
   /* get pointer to handle and comparison operation */
-  DTCMP_Handle_t* c = (DTCMP_Handle_t*) cmp;
+  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) cmp;
   DTCMP_Op_fn compare = c->fn;
 
   /* invoke comparison function to compare a and b */
@@ -105,6 +105,58 @@ int dtcmp_op_fn_int_descend(const void* bufa, const void* bufb)
 {
   int a = *(int*)bufa;
   int b = *(int*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_uint32t_ascend(const void* bufa, const void* bufb)
+{
+  uint32_t a = *(uint32_t*)bufa;
+  uint32_t b = *(uint32_t*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_uint32t_descend(const void* bufa, const void* bufb)
+{
+  uint32_t a = *(uint32_t*)bufa;
+  uint32_t b = *(uint32_t*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_uint64t_ascend(const void* bufa, const void* bufb)
+{
+  uint64_t a = *(uint64_t*)bufa;
+  uint64_t b = *(uint64_t*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_uint64t_descend(const void* bufa, const void* bufb)
+{
+  uint64_t a = *(uint64_t*)bufa;
+  uint64_t b = *(uint64_t*)bufb;
   if (a > b) {
     return -1;
   } else if (b > a) {

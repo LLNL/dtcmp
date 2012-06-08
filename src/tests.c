@@ -232,20 +232,25 @@ int main(int argc, char* argv[])
  *
  *   items already in order
  *   items in reverse order
+ *   items in random order
  *
  */
 
   char* test;
-  MPI_Datatype key, keysat;
+  void* inbuf;
+  void* outbuf;
   int size;
+  MPI_Datatype key, keysat;
   DTCMP_Op op;
   MPI_Comm comm;
 
-  int inbuf[SIZE], outbuf[SIZE];
+  int in_1int[SIZE], out_1int[SIZE];
   for (i = 0; i < SIZE; i++) {
-    inbuf[i] = -(i*10 + rank);
-    outbuf[i] = 0;
+    in_1int[i] = -(i*10 + rank);
+    out_1int[i] = 0;
   }
+  inbuf  = (void*) in_1int;
+  outbuf = (void*) out_1int;
 
   key    = MPI_INT;
   keysat = MPI_INT;
@@ -272,39 +277,86 @@ int main(int argc, char* argv[])
   op = DTCMP_OP_INT_DESCEND;
   test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
 
-#if 0
-  int insatbuf[SIZE*2], outsatbuf[SIZE*2];
+  int in_2int[SIZE*2], out_2int[SIZE*2];
   for (i = 0; i < SIZE; i++) {
-    insatbuf[i*2+0] = -(i*10 + rank);
+    in_2int[i*2+0] = -(i*10 + rank);
 //    insatbuf[i*2+0] = 35 - (i%2);
-    insatbuf[i*2+1] = +(i*10 + rank);
-    outsatbuf[i*2+0] = 0;
-    outsatbuf[i*2+1] = 0;
+    in_2int[i*2+1] = +(i*10 + rank);
+    out_2int[i*2+0] = 0;
+    out_2int[i*2+1] = 0;
   }
-
-  DTCMP_Op cmp_2int;
-  DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_DESCEND, &cmp_2int);
+  inbuf  = (void*) in_2int;
+  outbuf = (void*) out_2int;
 
   MPI_Datatype type_2int;
   MPI_Type_contiguous(2, MPI_INT, &type_2int);
-//  MPI_Type_vector(2, 1, 2, MPI_INT, &type_2int);
   MPI_Type_commit(&type_2int);
 
-  DTCMP_Sortv(insatbuf, outsatbuf, size, type_2int, type_2int, cmp_2int, MPI_COMM_WORLD);
-//  DTCMP_Sortv(insatbuf, outsatbuf, size, MPI_INT, type_2int, DTCMP_OP_INT_ASCEND, MPI_COMM_WORLD);
-//  DTCMP_Sortv_allgather(insatbuf, outsatbuf, size, MPI_INT, type_2int, DTCMP_OP_INT_ASCEND, MPI_COMM_WORLD);
-//  DTCMP_Sortv_sortgather_scatter(insatbuf, outsatbuf, size, MPI_INT, type_2int, DTCMP_OP_INT_ASCEND, MPI_COMM_WORLD);
-//  DTCMP_Sortv_sortgather_scatter(insatbuf, outsatbuf, size, type_2int, type_2int, cmp_2int, MPI_COMM_WORLD);
+  key    = MPI_INT;
+  keysat = type_2int;
+  comm   = MPI_COMM_WORLD;
+
+  size = 0;
+  test = "0 INT/2INT ASCEND";
+  op = DTCMP_OP_INT_ASCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  size = 1;
+  test = "1 INT/2INT ASCEND";
+  op = DTCMP_OP_INT_ASCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "1 INT/2INT DESCEND";
+  op = DTCMP_OP_INT_DESCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  size = SIZE;
+  test = "SIZE INT/2INT ASCEND";
+  op = DTCMP_OP_INT_ASCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "SIZE INT/2INT DESCEND";
+  op = DTCMP_OP_INT_DESCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  DTCMP_Op cmp_updown, cmp_downdown;
+  DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_DESCEND, &cmp_updown);
+  DTCMP_Op_create_series(DTCMP_OP_INT_DESCEND, DTCMP_OP_INT_DESCEND, &cmp_downdown);
+
+  key    = type_2int;
+  keysat = type_2int;
+  comm   = MPI_COMM_WORLD;
+
+  size = 0;
+  test = "0 2INT/2INT ASCEND";
+  op = cmp_updown;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  size = 1;
+  test = "1 2INT/2INT ASCEND";
+  op = cmp_updown;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "1 2INT/2INT DESCEND";
+  op = cmp_downdown;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  size = SIZE;
+  test = "SIZE 2INT/2INT ASCEND";
+  op = cmp_updown;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "SIZE 2INT/2INT DESCEND";
+  op = cmp_downdown;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+#if 0
   int sortz_outcount;
   void* sortz_outbuf;
   DTCMP_Handle handle;
   DTCMP_Sortz(insatbuf, size, &sortz_outbuf, &sortz_outcount, type_2int, type_2int, cmp_2int, MPI_COMM_WORLD, &handle);
   DTCMP_Free(&handle);
+#endif
 
   MPI_Type_free(&type_2int);
-
-  DTCMP_Op_free(&cmp_2int);
-#endif
+  DTCMP_Op_free(&cmp_downdown);
+  DTCMP_Op_free(&cmp_updown);
 
   DTCMP_Finalize();
   MPI_Finalize();
