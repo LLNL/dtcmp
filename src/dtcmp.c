@@ -116,6 +116,20 @@ static int dtcmp_type_is_valid(MPI_Datatype type)
   return 1;
 }
 
+static int dtcmp_op_is_valid(DTCMP_Op cmp)
+{
+  if (cmp == DTCMP_OP_NULL) {
+    return 0;
+  }
+
+  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) cmp;
+  if (c->magic != 1) {
+    return 0;
+  }
+
+  return 1;
+}
+
 /* user-defined reduction operation to compute min/max/sum */
 static void dtcmp_reducefn_uint64t_min_max_sum(void* invec, void* inoutvec, int* len, MPI_Datatype* type)
 {
@@ -322,6 +336,16 @@ int DTCMP_Op_free(DTCMP_Op* cmp)
     }
     free(*cmp);
     *cmp = DTCMP_OP_NULL;
+    return DTCMP_SUCCESS;
+  } else {
+    return DTCMP_FAILURE;
+  }
+}
+
+int DTCMP_Op_eval(const void* a, const void* b, DTCMP_Op cmp, int* flag)
+{
+  if (flag != NULL && cmp != DTCMP_OP_NULL) {
+    *flag = dtcmp_op_eval(a, b, cmp);
     return DTCMP_SUCCESS;
   } else {
     return DTCMP_FAILURE;

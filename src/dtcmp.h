@@ -114,35 +114,46 @@ extern DTCMP_Op DTCMP_OP_LONGDOUBLE_DESCEND;
 /* create a user-defined comparison operation,
  * associate datatype of key and compare function with handle */
 int DTCMP_Op_create(
-  MPI_Datatype key, /* IN  - datatype of items being compared */
+  MPI_Datatype key, /* IN  - datatype of items being compared (handle) */
   DTCMP_Op_fn fn,   /* IN  - function to compare two items */
-  DTCMP_Op* cmp     /* OUT - handle to comparison operation */
+  DTCMP_Op* cmp     /* OUT - comparison operation (handle) */
 );
 
 /* create a series comparison which executes the first comparison
  * operation and then the second if the first evaluates to equal,
  * second key is assumed to be located extent(first) bytes from first */
 int DTCMP_Op_create_series(
-  DTCMP_Op first,   /* IN  - first cmp operation */
-  DTCMP_Op second,  /* IN  - second cmp operation if first is equal */
-  DTCMP_Op* cmp     /* OUT - handle to comparison operation */
+  DTCMP_Op first,   /* IN  - first cmp operation (handle) */
+  DTCMP_Op second,  /* IN  - second cmp operation if first is equal (handle) */
+  DTCMP_Op* cmp     /* OUT - comparison operation (handle) */
 );
 
 /* create a series comparison which executes the first comparison
  * operation and then the second if the first evaluates to equal,
  * explicit byte displacement is given to go from first to second key */
 int DTCMP_Op_create_hseries(
-  DTCMP_Op first,   /* IN  - first cmp operation */
+  DTCMP_Op first,   /* IN  - first cmp operation (handle) */
   MPI_Aint disp,    /* IN  - byte displacement to advance pointer to
-                     *       start of second item */
-  DTCMP_Op second,  /* IN  - second cmp operation if first is equal */
-  DTCMP_Op* cmp     /* OUT - handle to comparison operation */
+                     *       start of second item (integer) */
+  DTCMP_Op second,  /* IN  - second cmp operation if first is equal (handle) */
+  DTCMP_Op* cmp     /* OUT - comparison operation (handle) */
 );
 
 /* free object referenced by comparison operation handle,
  * sets cmp to DTCMP_OP_NULL upon return */
 int DTCMP_Op_free(
-  DTCMP_Op* cmp     /* INOUT - handle to comparison function */
+  DTCMP_Op* cmp     /* INOUT - comparison function (handle) */
+);
+
+/* compares a to b using cmp op and sets flag to
+ *    1 if a > b
+ *    0 if a = b
+ *   -1 if a < b */
+int DTCMP_Op_eval(
+  const void* a,    /* IN  - buffer holding item a */
+  const void* b,    /* IN  - buffer holding item b */
+  DTCMP_Op cmp,     /* IN  - comparison function (handle) */
+  int* flag
 );
 
 /* ----------------------------------------------

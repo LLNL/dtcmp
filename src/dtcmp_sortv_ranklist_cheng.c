@@ -22,7 +22,7 @@
  * "A Scalable MPI_Comm_split Algorithm for Exascale Computing", 2010
  * Paul Sack, William Gropp
  *
- * Notable design details:
+ * Notable difference from Cheng's design:
  * - When computing the median of medians, each process is responsible
  *   for finding one splitter.  We use an all-to-all to distribute
  *   the contribution from each process for each splitter.  Further
@@ -122,12 +122,24 @@ static void compute_weighted_median(
     ptr += size_int_with_key;
 
     /* add weights for any elements which equal this current median */
-    int result = dtcmp_op_eval(ptr + sizeof(int), target, keycmp);
+    int result;
+    int weight = *(int*) ptr;
+    if (weight > 0) {
+      result = dtcmp_op_eval(ptr + sizeof(int), target, keycmp);
+    } else {
+      result = 0;
+    }
     while (i < group_ranks && result == 0) {
-      current += *(int*) ptr;
+      current += weight;
       i++;
       ptr += size_int_with_key;
-      result = dtcmp_op_eval(ptr + sizeof(int), target, keycmp);
+
+      weight = *(int*) ptr;
+      if (weight > 0) {
+        result = dtcmp_op_eval(ptr + sizeof(int), target, keycmp);
+      } else {
+        result = 0;
+      }
     }
 
     /* determine if the weight before and after this value are
@@ -297,7 +309,7 @@ static int find_splitters(
     int can_break = 1;
     for (i = 0; i < group_ranks; i++) {
       int N = *(int*) (out_num_with_median + i * size_int_with_key);
-      if (N == 1) {
+      if (N <= 1) {
         found_exact[i] = 1;
       }
       if (N > serial_search_threshold && !found_exact[i]) {
@@ -312,6 +324,8 @@ static int find_splitters(
     for (i = 0; i < group_ranks; i++) {
       /* if we already found the split point for this range, go to next */
       if (found_exact[i]) {
+        counts[i*2+LT] = 0;
+        counts[i*2+EQ] = 0;
         continue;
       }
 
@@ -375,11 +389,14 @@ static int find_splitters(
   if (all_exact) {
     /* if we found all values exactly, then just copy them into array */
     for (i = 0; i < group_ranks; i++) {
-      memcpy(
-        (char*)splitters + i * key_true_extent,
-        out_num_with_median + i * size_int_with_key + sizeof(int),
-        key_true_extent
-      );
+      int valid_splitter = *(int*) (out_num_with_median + i * size_int_with_key);
+      if (valid_splitter != 0) {
+        memcpy(
+          (char*)splitters + i * key_true_extent,
+          out_num_with_median + i * size_int_with_key + sizeof(int),
+          key_true_extent
+        );
+      }
     }
   } else {
     /* otherwise, distribute remaining ranges to processes to sort and search */
@@ -554,14 +571,14 @@ int DTCMP_Sortv_ranklist_cheng(
     group_rank, group_ranks, comm_ranklist, comm
   );
 
-  /* search for index values for these split points in our local data */
-  DTCMP_Search_low_list_local(
-    group_ranks, splitters, outbuf, 0, count-1,
-    key, keysat, cmp, flags, indicies
-  );
-
-  /* set our send counts */
   if (count > 0) {
+    /* search for index values for these split points in our local data */
+    DTCMP_Search_low_list_local(
+      group_ranks, splitters, outbuf, 0, count-1,
+      key, keysat, cmp, flags, indicies
+    );
+
+    /* set our send counts */
     i = 0;
     int current_index = 0;
     while (current_index < count && i < group_ranks-1) {
@@ -575,6 +592,11 @@ int DTCMP_Sortv_ranklist_cheng(
     while (i < group_ranks) {
       sendcounts[i] = 0;
       i++;
+    }
+  } else {
+    /* we don't have anything so set all send counts to zero */
+    for (i = 0; i < group_ranks; i++) {
+      sendcounts[i] = 0;
     }
   }
 
