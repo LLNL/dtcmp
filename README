@@ -30,19 +30,26 @@ efficient, and portable, so it will generally be a good option except
 for those cases where the application bottleneck demands absolute
 performance.
 
-Currently, only a few pre-defined comparison operations are provided.
-More will be added with time.  All pre-defined operations have the
-following naming convention:
+Currently, the following pre-defined comparison operations are
+provided. More will be added with time.  All pre-defined operations
+have the following naming convention:
 
   DTCMP_OP_<TYPE>_<DIRECTION>
 
 where <TYPE> may be one of
 
-  INT     - C int
-  UINT32T - C uint32_t
-  UINT64T - C uint64_t
-  FLOAT   - C float
-  DOUBLE  - C double
+  INT              - C int
+  LONG             - C long
+  UNSIGNEDLONG     - C unsigned long
+  LONGLONG         - C long long
+  UNSIGNEDLONGLONG - C unsigned long long
+  INT32T           - C int32_t
+  INT64T           - C int64_t
+  UINT32T          - C uint32_t
+  UINT64T          - C uint64_t
+  FLOAT            - C float
+  DOUBLE           - C double
+  LONGDOUBLE       - C long double
 
 and <DIRECTION> may be one of:
 

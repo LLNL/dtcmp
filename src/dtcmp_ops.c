@@ -114,6 +114,162 @@ int dtcmp_op_fn_int_descend(const void* bufa, const void* bufb)
   }
 }
 
+int dtcmp_op_fn_long_ascend(const void* bufa, const void* bufb)
+{
+  long a = *(long*)bufa;
+  long b = *(long*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_long_descend(const void* bufa, const void* bufb)
+{
+  long a = *(long*)bufa;
+  long b = *(long*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_unsignedlong_ascend(const void* bufa, const void* bufb)
+{
+  unsigned long a = *(unsigned long*)bufa;
+  unsigned long b = *(unsigned long*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_unsignedlong_descend(const void* bufa, const void* bufb)
+{
+  unsigned long a = *(unsigned long*)bufa;
+  unsigned long b = *(unsigned long*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_longlong_ascend(const void* bufa, const void* bufb)
+{
+  long long a = *(long long*)bufa;
+  long long b = *(long long*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_longlong_descend(const void* bufa, const void* bufb)
+{
+  long long a = *(long long*)bufa;
+  long long b = *(long long*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_unsignedlonglong_ascend(const void* bufa, const void* bufb)
+{
+  unsigned long long a = *(unsigned long long*)bufa;
+  unsigned long long b = *(unsigned long long*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_unsignedlonglong_descend(const void* bufa, const void* bufb)
+{
+  unsigned long long a = *(unsigned long long*)bufa;
+  unsigned long long b = *(unsigned long long*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_int32t_ascend(const void* bufa, const void* bufb)
+{
+  int32_t a = *(int32_t*)bufa;
+  int32_t b = *(int32_t*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_int32t_descend(const void* bufa, const void* bufb)
+{
+  int32_t a = *(int32_t*)bufa;
+  int32_t b = *(int32_t*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_int64t_ascend(const void* bufa, const void* bufb)
+{
+  int64_t a = *(int64_t*)bufa;
+  int64_t b = *(int64_t*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_int64t_descend(const void* bufa, const void* bufb)
+{
+  int64_t a = *(int64_t*)bufa;
+  int64_t b = *(int64_t*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
 int dtcmp_op_fn_uint32t_ascend(const void* bufa, const void* bufb)
 {
   uint32_t a = *(uint32_t*)bufa;
@@ -209,6 +365,32 @@ int dtcmp_op_fn_double_descend(const void* bufa, const void* bufb)
 {
   double a = *(double*)bufa;
   double b = *(double*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_longdouble_ascend(const void* bufa, const void* bufb)
+{
+  long double a = *(long double*)bufa;
+  long double b = *(long double*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_longdouble_descend(const void* bufa, const void* bufb)
+{
+  long double a = *(long double*)bufa;
+  long double b = *(long double*)bufb;
   if (a > b) {
     return -1;
   } else if (b > a) {
