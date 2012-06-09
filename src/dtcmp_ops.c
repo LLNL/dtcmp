@@ -140,32 +140,6 @@ int dtcmp_op_fn_long_descend(const void* bufa, const void* bufb)
   }
 }
 
-int dtcmp_op_fn_unsignedlong_ascend(const void* bufa, const void* bufb)
-{
-  unsigned long a = *(unsigned long*)bufa;
-  unsigned long b = *(unsigned long*)bufb;
-  if (a < b) {
-    return -1;
-  } else if (b < a) {
-    return  1;
-  } else {
-    return 0;
-  }
-}
-
-int dtcmp_op_fn_unsignedlong_descend(const void* bufa, const void* bufb)
-{
-  unsigned long a = *(unsigned long*)bufa;
-  unsigned long b = *(unsigned long*)bufb;
-  if (a > b) {
-    return -1;
-  } else if (b > a) {
-    return  1;
-  } else {
-    return 0;
-  }
-}
-
 int dtcmp_op_fn_longlong_ascend(const void* bufa, const void* bufb)
 {
   long long a = *(long long*)bufa;
@@ -192,6 +166,32 @@ int dtcmp_op_fn_longlong_descend(const void* bufa, const void* bufb)
   }
 }
 
+int dtcmp_op_fn_unsignedlong_ascend(const void* bufa, const void* bufb)
+{
+  unsigned long a = *(unsigned long*)bufa;
+  unsigned long b = *(unsigned long*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_unsignedlong_descend(const void* bufa, const void* bufb)
+{
+  unsigned long a = *(unsigned long*)bufa;
+  unsigned long b = *(unsigned long*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
 int dtcmp_op_fn_unsignedlonglong_ascend(const void* bufa, const void* bufb)
 {
   unsigned long long a = *(unsigned long long*)bufa;
@@ -209,6 +209,58 @@ int dtcmp_op_fn_unsignedlonglong_descend(const void* bufa, const void* bufb)
 {
   unsigned long long a = *(unsigned long long*)bufa;
   unsigned long long b = *(unsigned long long*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_int8t_ascend(const void* bufa, const void* bufb)
+{
+  int8_t a = *(int8_t*)bufa;
+  int8_t b = *(int8_t*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_int8t_descend(const void* bufa, const void* bufb)
+{
+  int8_t a = *(int8_t*)bufa;
+  int8_t b = *(int8_t*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_int16t_ascend(const void* bufa, const void* bufb)
+{
+  int16_t a = *(int16_t*)bufa;
+  int16_t b = *(int16_t*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_int16t_descend(const void* bufa, const void* bufb)
+{
+  int16_t a = *(int16_t*)bufa;
+  int16_t b = *(int16_t*)bufb;
   if (a > b) {
     return -1;
   } else if (b > a) {
@@ -261,6 +313,58 @@ int dtcmp_op_fn_int64t_descend(const void* bufa, const void* bufb)
 {
   int64_t a = *(int64_t*)bufa;
   int64_t b = *(int64_t*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_uint8t_ascend(const void* bufa, const void* bufb)
+{
+  uint8_t a = *(uint8_t*)bufa;
+  uint8_t b = *(uint8_t*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_uint8t_descend(const void* bufa, const void* bufb)
+{
+  uint8_t a = *(uint8_t*)bufa;
+  uint8_t b = *(uint8_t*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_uint16t_ascend(const void* bufa, const void* bufb)
+{
+  uint16_t a = *(uint16_t*)bufa;
+  uint16_t b = *(uint16_t*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_uint16t_descend(const void* bufa, const void* bufb)
+{
+  uint16_t a = *(uint16_t*)bufa;
+  uint16_t b = *(uint16_t*)bufb;
   if (a > b) {
     return -1;
   } else if (b > a) {

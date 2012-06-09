@@ -40,11 +40,15 @@ where <TYPE> may be one of
 
   INT              - C int
   LONG             - C long
-  UNSIGNEDLONG     - C unsigned long
   LONGLONG         - C long long
+  UNSIGNEDLONG     - C unsigned long
   UNSIGNEDLONGLONG - C unsigned long long
+  INT8T            - C int8_t
+  INT16T           - C int16_t
   INT32T           - C int32_t
   INT64T           - C int64_t
+  UINT8T           - C uint8_t
+  UINT16T          - C uint16_t
   UINT32T          - C uint32_t
   UINT64T          - C uint64_t
   FLOAT            - C float
