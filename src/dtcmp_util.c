@@ -9,6 +9,8 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+
 #include "mpi.h"
 #include "dtcmp_internal.h"
 
@@ -117,4 +119,57 @@ int dtcmp_get_uint64t_min_max_sum(int count, uint64_t* min, uint64_t* max, uint6
   *sum = output[MMS_SUM];
 
   return DTCMP_SUCCESS;
+}
+
+/* builds and commits a new datatype that is the concatenation of the
+ * list of old types, each oldtype should have no holes */
+int dtcmp_type_concat(int num, const MPI_Datatype oldtypes[], MPI_Datatype* newtype)
+{
+  /* if there is nothing in the list, just return a NULL handle */
+  if (num <= 0) {
+    *newtype = MPI_DATATYPE_NULL;
+    return DTCMP_SUCCESS;
+  }
+
+  /* TODO: could use a small array to handle most calls,
+   * rather than allocate an array each time */
+
+  /* allocate memory for blocklens, displs, and types arrays for
+   * MPI_Type_create_struct */
+  int* blocklens      = (int*) dtcmp_malloc(num * sizeof(int), 0, __FILE__, __LINE__);
+  MPI_Aint* displs    = (MPI_Aint*) dtcmp_malloc(num * sizeof(MPI_Aint), 0, __FILE__, __LINE__);
+  MPI_Datatype* types = (MPI_Datatype*) dtcmp_malloc(num * sizeof(MPI_Datatype), 0, __FILE__, __LINE__);
+
+  /* build new key type */
+  int i;
+  MPI_Aint disp = 0;
+  for (i = 0; i < num; i++) {
+    blocklens[i] = 1;
+    displs[i] = disp;
+    types[i] = oldtypes[i];
+
+    /* get true extent of current type */
+    MPI_Aint true_lb, true_extent;
+    MPI_Type_get_true_extent(oldtypes[i], &true_lb, &true_extent);
+    disp += true_extent;
+  }
+
+  /* create and commit the new type */
+  MPI_Type_create_struct(num, blocklens, displs, types, newtype);
+  MPI_Type_commit(newtype);
+
+  /* free memory */
+  dtcmp_free(&types);
+  dtcmp_free(&displs);
+  dtcmp_free(&blocklens);
+
+  return DTCMP_SUCCESS;
+}
+
+int dtcmp_type_concat2(MPI_Datatype type1, MPI_Datatype type2, MPI_Datatype* newtype)
+{
+  MPI_Datatype types[2];
+  types[0] = type1;
+  types[1] = type2;
+  return dtcmp_type_concat(2, types, newtype);
 }

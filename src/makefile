@@ -11,6 +11,7 @@ OBJS= \
   dtcmp.o \
   dtcmp_util.o \
   dtcmp_ops.o \
+  dtcmp_uniqify.o \
   dtcmp_search_binary.o \
   dtcmp_partition.o \
   dtcmp_merge_2way.o \

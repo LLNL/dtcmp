@@ -265,16 +265,8 @@ static int find_splitters(
   DTCMP_Op_create_series(cmp_count_nonzero, cmp, &cmp_int_with_key);
 
   /* create and commit datatype to represent concatenation of int with key */
-  MPI_Datatype type_tmp, type_int_with_key;
-  int blocklens[2] = {1,1};
-  MPI_Aint displs[2] = {0,sizeof(int)};
-  MPI_Datatype types[2];
-  types[0] = MPI_INT;
-  types[1] = key;
-  MPI_Type_create_struct(2, blocklens, displs, types, &type_tmp);
-  MPI_Type_create_resized(type_tmp, 0, (MPI_Aint)size_int_with_key, &type_int_with_key);
-  MPI_Type_free(&type_tmp);
-  MPI_Type_commit(&type_int_with_key);
+  MPI_Datatype type_int_with_key;
+  dtcmp_type_concat2(MPI_INT, key, &type_int_with_key);
 
   while (1) {
     /* for each range, pick a median and record number of active elements

@@ -48,18 +48,12 @@ static int detect_edges(
   size_t scan_buf_size = 2 * sizeof(int) + size;
 
   /* build type for exchange */
-  MPI_Datatype type_tmp, type_item;
-  int blocklens[2] = {2,1};
-  MPI_Aint displs[2];
-  displs[0] = 0;
-  displs[1] = 2 * sizeof(int);
-  MPI_Datatype types[2];
+  MPI_Datatype type_item;
+  MPI_Datatype types[3];
   types[0] = MPI_INT;
-  types[1] = item;
-  MPI_Type_create_struct(2, blocklens, displs, types, &type_tmp);
-  MPI_Type_create_resized(type_tmp, 0, (MPI_Aint)scan_buf_size, &type_item);
-  MPI_Type_free(&type_tmp);
-  MPI_Type_commit(&type_item);
+  types[1] = MPI_INT;
+  types[2] = item;
+  dtcmp_type_concat(3, types, &type_item);
 
   /* declare pointers to our scan buffers */
   char* recv_left_buf  = dtcmp_malloc(scan_buf_size, 0, __FILE__, __LINE__);
@@ -464,19 +458,12 @@ int DTCMP_Rankv_sort(
   MPI_Type_get_true_extent(key, &key_true_lb, &key_true_extent);
 
   /* create type to be sorted: key, then rank (int), then index (int) */
-  size_t rank_item_size = key_true_extent + 2 * sizeof(int);
-  MPI_Datatype type_tmp, type_item;
-  int blocklens[2] = {1,2};
-  MPI_Aint displs[2];
-  displs[0] = 0;
-  displs[1] = key_true_extent;
-  MPI_Datatype types[2];
+  MPI_Datatype type_item;
+  MPI_Datatype types[3];
   types[0] = key;
   types[1] = MPI_INT;
-  MPI_Type_create_struct(2, blocklens, displs, types, &type_tmp);
-  MPI_Type_create_resized(type_tmp, 0, (MPI_Aint)rank_item_size, &type_item);
-  MPI_Type_free(&type_tmp);
-  MPI_Type_commit(&type_item);
+  types[2] = MPI_INT;
+  dtcmp_type_concat(3, types, &type_item);
 
   /* create our comparison operation for sorting:
    * sort by key, then rank, then index */

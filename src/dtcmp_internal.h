@@ -53,6 +53,7 @@ extern unsigned dtcmp_rand_seed;
  * --------------------------------------- */
 
 void* dtcmp_malloc(size_t size, size_t alignment, const char* file, int line);
+
 void dtcmp_free(void*);
 
 /* function pointer to a DTCMP_Free implementation that takes a pointer to a handle */
@@ -71,6 +72,57 @@ int dtcmp_handle_free_single(DTCMP_Handle* handle);
 #define MMS_MAX (1)
 #define MMS_SUM (2)
 int dtcmp_get_uint64t_min_max_sum(int count, uint64_t* min, uint64_t* max, uint64_t* sum, MPI_Comm comm);
+
+/* builds and commits a new datatype that is the concatenation of the
+ * list of old types, each oldtype should have no holes */
+int dtcmp_type_concat(int num, const MPI_Datatype oldtypes[], MPI_Datatype* newtype);
+
+/* same as above but a shortcut when using just two input types */
+int dtcmp_type_concat2(MPI_Datatype type1, MPI_Datatype type2, MPI_Datatype* newtype);
+
+/* ---------------------------------------
+ * Uniqify functions - ensure every element is unique for stable sorts
+ * --------------------------------------- */
+
+/* the dtcmp_uniqify function takes an input buffer with count, key,
+ * keysat, and comparison operation and allocates a new buffer ensuring
+ * each element is unique by copying original elements with rank and
+ * original index, returns new buffer, new key and ketsat types, and
+ * new comparison operation.  When done, the associated handle must be
+ * passed to DTCMP_Handle_free to free the buffer and newly created
+ * types. */
+int dtcmp_uniqify(
+  const void* buf, int count, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op cmp,
+  void** outbuf, MPI_Datatype* outkey, MPI_Datatype* outkeysat, DTCMP_Op* outcmp,
+  MPI_Comm comm, DTCMP_Handle* handle
+);
+
+int dtcmp_deuniqify(
+  const void* buf, int count, MPI_Datatype key, MPI_Datatype keysat,
+  void* outbuf, MPI_Datatype outkey, MPI_Datatype outkeysat
+);
+
+int dtcmp_deuniqifyz(
+  const void* buf, int count, MPI_Datatype key, MPI_Datatype keysat,
+  void** outbuf, MPI_Datatype outkey, MPI_Datatype outkeysat,
+  DTCMP_Handle* handle
+);
+
+typedef struct {
+  MPI_Datatype key;
+  MPI_Datatype keysat;
+  DTCMP_Op cmp;
+  void* buf;
+} dtcmp_handle_uniqify_t;
+
+/* allocates a block of memory like handle_alloc_single, but also
+ * includes room for a dtcmp_handle_uniqify_t struct right after
+ * the function pointer to the free function */
+int dtcmp_handle_alloc_uniqify(size_t size, dtcmp_handle_uniqify_t** vals, DTCMP_Handle* handle);
+
+/* frees the types and op associated with internal dtcmp_handle_uniqify_t
+ * struct and then frees block of memory associated with handle */
+int dtcmp_handle_free_uniqify(DTCMP_Handle* handle);
 
 /* ---------------------------------------
  * Seach implementations

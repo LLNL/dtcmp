@@ -10,39 +10,6 @@
 #include "mpi.h"
 #include "dtcmp_internal.h"
 
-int DTCMP_Concat_true_extents(
-  MPI_Datatype type1,
-  MPI_Datatype type2,
-  MPI_Aint* extent1,
-  MPI_Datatype* typeout)
-{
-  int rc = DTCMP_SUCCESS;
-
-  /* get true extent of first type */
-  MPI_Aint lb, extent;
-  MPI_Type_get_true_extent(type1, &lb, &extent);
-
-  /* create struct of concat of type1 and type2 */
-  int blocklens[2] = {1,1};
-
-  /* TODO: need to handle lower bound here */
-  MPI_Aint displs[2];
-  displs[0] = 0;
-  displs[1] = extent;
-
-  MPI_Datatype types[2];
-  types[0] = type1;
-  types[1] = type2;
-
-  MPI_Datatype type;
-  MPI_Type_create_struct(2, blocklens, displs, types, &type);
-
-  *extent1 = extent;
-  *typeout = type;
-
-  return rc;
-}
-
 void copy_key_if_valid(
   void* invec,
   void* inoutvec,
@@ -182,10 +149,8 @@ int DTCMP_Is_sorted(
   }
 
   /* create and commit type that consists of leading int followed by key */
-  MPI_Aint int_true_extent;
   MPI_Datatype validtype;
-  DTCMP_Concat_true_extents(MPI_INT, key, &int_true_extent, &validtype);
-  MPI_Type_commit(&validtype);
+  dtcmp_type_concat2(MPI_INT, key, &validtype);
 
   /* create user-defined reduction operation to copy key if its valid */
   MPI_Op validop;

@@ -215,6 +215,10 @@ int DTCMP_Sortz_samplesort(
   MPI_Comm comm,
   DTCMP_Handle* handle)
 {
+  /* TODO: as algorithm is currently written, we need to force elements
+   * to be unique, otherwise, we need to put some prefix sums in place
+   * to determine to which rank each rank should send its data */
+
   /* right now, this only supports calls where sum > 0 and min == max */
   uint64_t min, max, sum;
   dtcmp_get_uint64t_min_max_sum(incount, &min, &max, &sum, comm);
@@ -234,8 +238,46 @@ int DTCMP_Sortz_samplesort(
     return DTCMP_FAILURE;
   }
 
+  /* if the input elements are not unique, we'll call a function to
+   * to force them to be unique by attaching additional components,
+   * this also builds new types and comparison ops */
+  void* tmpbuf;
+  MPI_Datatype tmpkey, tmpkeysat;
+  DTCMP_Op tmpcmp;
+  DTCMP_Handle uniq_handle;
+
+  int input_not_unique = 1;
+  if (input_not_unique) {
+    /* tack on rank and original index to each item and return new key
+     * and keysat types along with new comparison op */
+    dtcmp_uniqify(
+      inbuf, incount, key, keysat, cmp,
+      &tmpbuf, &tmpkey, &tmpkeysat, &tmpcmp,
+      comm, &uniq_handle
+    );
+  } else {
+    /* items are asserted to be unique, so just use original types and
+     * comparison op provided by caller */
+    tmpkey    = key;
+    tmpkeysat = keysat;
+    tmpcmp    = cmp;
+
+    /* get lower bound and extent of keysat */
+    MPI_Aint keysat_true_lb, keysat_true_extent;
+    MPI_Type_get_true_extent(keysat, &keysat_true_lb, &keysat_true_extent);
+
+    /* copy input data to a temporary buffer */
+    size_t tmpbuf_size = incount * keysat_true_extent;
+    tmpbuf = (void*) dtcmp_malloc(tmpbuf_size, 0, __FILE__, __LINE__);
+    DTCMP_Memcpy(tmpbuf, incount, keysat, inbuf, incount, keysat);
+  }
+
+  /* local sort */
+  DTCMP_Sort_local(DTCMP_IN_PLACE, tmpbuf, incount, tmpkey, tmpkeysat, tmpcmp);
+
   /* TODO: compute appropriate s value */
-  /* s = min(incount, 12*ceil(log(incount))) */
+  /* determine the number of samples to take on each process,
+   * s = min(incount, 12*ceil(log(incount))) */
   int log_count = 0;
   int size = 1;
   while (size < incount) {
@@ -256,37 +298,50 @@ int DTCMP_Sortz_samplesort(
   MPI_Comm_size(comm, &ranks);
 
   /* get lower bound and extent of key */
-  MPI_Aint key_true_lb, key_true_extent;
-  MPI_Type_get_true_extent(key, &key_true_lb, &key_true_extent);
-
-  /* get lower bound and extent of keysat */
-  MPI_Aint keysat_true_lb, keysat_true_extent;
-  MPI_Type_get_true_extent(keysat, &keysat_true_lb, &keysat_true_extent);
-
-  /* TODO: as algorithm is currently written, we need to force elements
-   * to be unique, otherwise, we need to put some prefix sums in place
-   * to determine to which rank each rank should send its data */
-
-  /* copy input data to a temporary buffer */
-  size_t tmpbuf_size = incount * keysat_true_extent;
-  char* tmpbuf = (char*) dtcmp_malloc(tmpbuf_size, 0, __FILE__, __LINE__);
-  DTCMP_Memcpy(tmpbuf, incount, keysat, inbuf, incount, keysat);
-
-  /* local sort */
-  DTCMP_Sort_local(DTCMP_IN_PLACE, tmpbuf, incount, key, keysat, cmp);
+  MPI_Aint tmpkey_true_lb, tmpkey_true_extent;
+  MPI_Type_get_true_extent(tmpkey, &tmpkey_true_lb, &tmpkey_true_extent);
 
   /* pick ranks-1 splitters */
   int num_splitters = ranks - 1;
-  size_t splitters_size = num_splitters * key_true_extent;
+  size_t splitters_size = num_splitters * tmpkey_true_extent;
   char* splitters = (char*) dtcmp_malloc(splitters_size, 0, __FILE__, __LINE__);
-  find_splitters(tmpbuf, incount, s, splitters, key, keysat, cmp, comm);
+  find_splitters(tmpbuf, incount, s, splitters, tmpkey, tmpkeysat, tmpcmp, comm);
 
   /* split local data, exchange, and merge recevied data */
-  split_exchange_merge(tmpbuf, incount, outbuf, outcount, num_splitters, splitters, key, keysat, cmp, comm, handle);
+  void* mergebuf;
+  int mergecount;
+  DTCMP_Handle merge_handle;
+  split_exchange_merge(
+    tmpbuf, incount, &mergebuf, &mergecount, num_splitters, splitters,
+    tmpkey, tmpkeysat, tmpcmp, comm, &merge_handle
+  );
 
   /* free memory */
   dtcmp_free(&splitters);
-  dtcmp_free(&tmpbuf);
+
+  if (input_not_unique) {
+    /* we had to make the keys unique, so stip off those extra
+     * components here */
+    dtcmp_deuniqifyz(
+      mergebuf, mergecount, tmpkey, tmpkeysat,
+      outbuf, key, keysat,
+      handle
+    );
+    *outcount = mergecount;
+
+    /* free temporary handles we created along the way */
+    DTCMP_Free(&merge_handle);
+    DTCMP_Free(&uniq_handle);
+  } else {
+    /* in this case, we just sorted directly with the caller's data,
+     * but we need to free the copy of the input buffer, and return
+     * the merge handle */
+    *outbuf   = mergebuf;
+    *outcount = mergecount;
+    *handle   = merge_handle;
+
+    dtcmp_free(&tmpbuf);
+  }
 
   return DTCMP_SUCCESS;
 }
