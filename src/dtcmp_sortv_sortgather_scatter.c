@@ -23,6 +23,10 @@
  * and sorted as the last step at the root, then scatter the sorted
  * elements back to children passing down same number they passed up */
 
+#define DTCMP_TAG_SORTV_MAX_GATHER   (1)
+#define DTCMP_TAG_SORTV_MERGE_TREE   (2)
+#define DTCMP_TAG_SORTV_SCATTER_TREE (3)
+
 typedef struct {
   void* buf;
   int count;
@@ -96,7 +100,7 @@ static int dtcmp_sortv_max_gather(
         /* send reduction data to parent and
          * remember the iteration in which we send */
         int send_rank = rank - dist;
-        MPI_Send(reduce, 4, MPI_UINT64_T, send_rank, 0, comm);
+        MPI_Send(reduce, 4, MPI_UINT64_T, send_rank, DTCMP_TAG_SORTV_MAX_GATHER, comm);
         send_iteration = iter;
       } else {
         /* compute the rank we'll receive from in this round */
@@ -105,7 +109,7 @@ static int dtcmp_sortv_max_gather(
           /* receive reduction data from this child */
           uint64_t recv_reduce[4];
           MPI_Status recv_status;
-          MPI_Recv(recv_reduce, 4, MPI_UINT64_T, recv_rank, 0, comm, &recv_status);
+          MPI_Recv(recv_reduce, 4, MPI_UINT64_T, recv_rank, DTCMP_TAG_SORTV_MAX_GATHER, comm, &recv_status);
 
           /* record the total number of elements from each child */
           count_list[count_size] = recv_reduce[SUM];
@@ -172,7 +176,7 @@ static int dtcmp_sortv_max_gather(
         /* receive totals */
         MPI_Status recv_status;
         int recv_rank = rank - dist;
-        MPI_Recv(reduce, 4, MPI_UINT64_T, recv_rank, 0, comm, &recv_status);
+        MPI_Recv(reduce, 4, MPI_UINT64_T, recv_rank, DTCMP_TAG_SORTV_MAX_GATHER, comm, &recv_status);
         received = 1;
       }
     } else {
@@ -180,7 +184,7 @@ static int dtcmp_sortv_max_gather(
       int send_rank = rank + dist;
       if (send_rank < ranks) {
         /* send data and update our offset for the next send */
-        MPI_Send(reduce, 4, MPI_UINT64_T, send_rank, 0, comm);
+        MPI_Send(reduce, 4, MPI_UINT64_T, send_rank, DTCMP_TAG_SORTV_MAX_GATHER, comm);
       }
     }
   }
@@ -193,7 +197,7 @@ static int dtcmp_sortv_max_gather(
   uint64_t max_count = (uint64_t) count;
   int block_size = 1;
   while (iter < max_iter) {
-    if (iter < send_iteration || send_iteration == -1) {
+    if (iter < count_size) {
       max_count += (uint64_t) count_list[iter];
     }
     block_size <<= 1;
@@ -243,67 +247,70 @@ int dtcmp_sortv_merge_tree(
   int dist = 1;
   int iter = 0;
   int send_iteration = -1;
-  if (count_max > 0) {
-    /* declare pointers for temporary buffers to receive elements */
-    send_buf = dtcmp_malloc(count_max * keysat_true_extent, 0, __FILE__, __LINE__);
-    void* merge_buf = dtcmp_malloc(count_max * keysat_true_extent, 0, __FILE__, __LINE__);
-    void* recv_buf  = dtcmp_malloc(count_max * keysat_true_extent, 0, __FILE__, __LINE__);
 
-    /* copy our input data to send buffer buffer and sort it */
-    DTCMP_Memcpy(send_buf, count, keysat, inbuf, count, keysat);
-    DTCMP_Sort_local(DTCMP_IN_PLACE, send_buf, count, key, keysat, cmp);
+  /* NOTE: because we're using dtcmp_malloc/free it's ok to allocate
+   * and free buffers of 0 size, other code should handle NULL pointers
+   * with a 0 count though */
 
-    /* gather data to sorters (and sort the data as it is gathered) */
-    int send_count = count;
-    while (send_iteration == -1 && iter < max_iter) {
-      /* determine whether we should send or receive in this round */
-      int send = rank & dist;
-      if (send) {
-        int send_rank = rank - dist;
-        if (send_count > 0) {
-          MPI_Send(send_buf, send_count, keysat, send_rank, 0, comm);
-        }
-        send_iteration = iter;
-      } else {
-        /* compute the rank we'll receive from in this round */
-        int recv_rank = rank + dist;
-        if (recv_rank < ranks) {
-          /* determine the number of entries we'll receive from this rank */
-          int recv_count = (int)count_list[iter];
-          if (recv_count > 0) {
-            /* receive the data */
-            MPI_Status recv_status;
-            MPI_Recv(recv_buf, recv_count, keysat, recv_rank, 0, comm, &recv_status);
+  /* declare pointers for temporary buffers to receive elements */
+  send_buf = dtcmp_malloc(count_max * keysat_true_extent, 0, __FILE__, __LINE__);
+  void* merge_buf = dtcmp_malloc(count_max * keysat_true_extent, 0, __FILE__, __LINE__);
+  void* recv_buf  = dtcmp_malloc(count_max * keysat_true_extent, 0, __FILE__, __LINE__);
+
+  /* copy our input data to send buffer buffer and sort it */
+  DTCMP_Memcpy(send_buf, count, keysat, inbuf, count, keysat);
+  DTCMP_Sort_local(DTCMP_IN_PLACE, send_buf, count, key, keysat, cmp);
+
+  /* gather data to sorters (and sort the data as it is gathered) */
+  int send_count = count;
+  while (send_iteration == -1 && iter < max_iter) {
+    /* determine whether we should send or receive in this round */
+    int send = rank & dist;
+    if (send) {
+      int send_rank = rank - dist;
+      if (send_count > 0) {
+        MPI_Send(send_buf, send_count, keysat, send_rank, DTCMP_TAG_SORTV_MERGE_TREE, comm);
+      }
+      send_iteration = iter;
+    } else {
+      /* compute the rank we'll receive from in this round */
+      int recv_rank = rank + dist;
+      if (recv_rank < ranks) {
+        /* determine the number of entries we'll receive from this rank */
+        int recv_count = (int)count_list[iter];
+        if (recv_count > 0) {
+          /* receive the data */
+          MPI_Status recv_status;
+          MPI_Recv(recv_buf, recv_count, keysat, recv_rank, DTCMP_TAG_SORTV_MERGE_TREE, comm, &recv_status);
   
-            /* merge our send and recv buffers into merge buffer */
-            const void* inbufs[2];
-            inbufs[0] = send_buf;
-            inbufs[1] = recv_buf;
-            int counts[2];
-            counts[0] = send_count;
-            counts[1] = recv_count;
-            DTCMP_Merge_local(2, inbufs, counts, merge_buf, key, keysat, cmp);
+          /* merge our send and recv buffers into merge buffer */
+          const void* inbufs[2];
+          inbufs[0] = send_buf;
+          inbufs[1] = recv_buf;
+          int counts[2];
+          counts[0] = send_count;
+          counts[1] = recv_count;
+          DTCMP_Merge_local(2, inbufs, counts, merge_buf, key, keysat, cmp);
 
-            /* swap our send buffer with our merge buffer */
-            void* tmp_buf = send_buf;
-            send_buf = merge_buf;
-            merge_buf = tmp_buf;
+          /* swap our send buffer with our merge buffer */
+          void* tmp_buf = send_buf;
+          send_buf = merge_buf;
+          merge_buf = tmp_buf;
 
-            /* add the number of received elements to our send count */
-            send_count += recv_count;
-          }
+          /* add the number of received elements to our send count */
+          send_count += recv_count;
         }
       }
-
-      /* go on to next step */
-      dist <<= 1;
-      iter++;
     }
 
-    /* free memory */
-    dtcmp_free(&recv_buf);
-    dtcmp_free(&merge_buf);
+    /* go on to next step */
+    dist <<= 1;
+    iter++;
   }
+
+  /* free memory */
+  dtcmp_free(&recv_buf);
+  dtcmp_free(&merge_buf);
 
   /* determine whether we are one of the ranks to do the sorting */
   int sorter = 0;
@@ -381,6 +388,10 @@ int dtcmp_sortv_scatter_tree(
   int send_iteration   = state->senditer;
   uint64_t* count_list = state->count_list;
 
+  /* NOTE: we avoid sending messages during the gather if counts are 0,
+   * however, we still send/recv 0 counts on the scatter in order to
+   * synchronization all procs */
+
   /* scatter sorted data back to ranks */
   int received = 0;
   if (state->sorter) {
@@ -397,7 +408,7 @@ int dtcmp_sortv_scatter_tree(
         /* receive data */
         int recv_rank = rank - dist;
         MPI_Status recv_status;
-        MPI_Recv(buf, count, keysat, recv_rank, 0, comm, &recv_status);
+        MPI_Recv(buf, count, keysat, recv_rank, DTCMP_TAG_SORTV_SCATTER_TREE, comm, &recv_status);
         received = 1;
       }
     } else {
@@ -412,7 +423,7 @@ int dtcmp_sortv_scatter_tree(
         size_t final_offset = ((size_t)count - (size_t)final_count) * (size_t)keysat_true_extent;
 
         /* send data and update our offset for the next send */
-        MPI_Send((char*)buf + final_offset, send_count, keysat, send_rank, 0, comm);
+        MPI_Send((char*)buf + final_offset, send_count, keysat, send_rank, DTCMP_TAG_SORTV_SCATTER_TREE, comm);
       }
     }
   }

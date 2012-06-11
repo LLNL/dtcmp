@@ -737,7 +737,7 @@ int DTCMP_Sortz(
   MPI_Type_get_true_extent(keysat, &keysat_true_lb, &keysat_true_extent);
   size_t outbuf_size = count * keysat_true_extent;
   dtcmp_handle_alloc_single(outbuf_size, outbuf, handle);
-  DTCMP_Sortv(inbuf, outbuf, count, key, keysat, cmp, comm);
+  DTCMP_Sortv(inbuf, *outbuf, count, key, keysat, cmp, comm);
   *outcount = count;
 
   return DTCMP_FAILURE;

@@ -167,3 +167,10 @@ currently only supports fixed-length keys.
 Currently, key and keysat datatypes must adhere to a certain set of
 constraints.  Namely, they cannot have holes, lb=0, extent > 0,
 extent=true extent, and extent=size.
+
+TODO:
+Add mechanism to provide assertions in API:
+  all_unique - caller ensures each key is globally unique
+  stable - caller is requesting that sort is stable
+  in_place - caller wants DTCMP to use in-place algorithms
+Routine to return communicator optimized for sorting
