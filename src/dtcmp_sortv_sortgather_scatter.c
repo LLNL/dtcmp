@@ -474,7 +474,7 @@ int DTCMP_Sortv_sortgather_scatter(
   dtcmp_sortv_merge_tree(max_mem, databuf, count, key, keysat, cmp, comm, &state);
 
   /* parallel sort over subset */
-  if (state.sorter) {
+  if (state.sort_ranks > 1 && state.sorter) {
     DTCMP_Sortv_ranklist_cheng(
       DTCMP_IN_PLACE, state.buf, state.count, key, keysat, cmp,
       state.sort_rank, state.sort_ranks, state.sort_group, comm

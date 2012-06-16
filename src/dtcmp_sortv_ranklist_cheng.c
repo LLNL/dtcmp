@@ -30,7 +30,7 @@
  *   sorts elements as part of the communication algorithm.  An allgather
  *   is used to collect the proposed splitter from each process. */
 
-#define THRESH (1)
+#define THRESH (0)
 #define LT (0)
 #define EQ (1)
 
@@ -213,7 +213,7 @@ static int find_exact_splitters(
   /* tracks number of items in each active range */
   int* num = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
 
-  /* flag per rank signifying its median is exact */
+  /* flag per rank signifying whether its median is exact */
   int* found_exact = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* candidate median for each splitter with count from local rank */
@@ -243,7 +243,7 @@ static int find_exact_splitters(
   /* scratch space used to compute median-of-medians */
   void* weighted_median_scratch = dtcmp_malloc((group_ranks + 1) * size_int_with_key, 0, __FILE__, __LINE__);
 
-  /* compute split points based on the number of ranks each task contributes,
+  /* compute split points based on the number of items each task contributes,
    * we want the task to end up with the same number of elements */
 
   /* gather number of elements each process is contributing
@@ -263,11 +263,11 @@ static int find_exact_splitters(
   /* initialize our active ranges */
   for (i = 0; i < group_ranks; i++) {
     index[i] = 0;
-    num[i] = n;
+    num[i]   = n;
     found_exact[i] = 0;
   }
 
-  /* create new comparison operation to compare number, then key,
+  /* create new comparison operation to compare count, then key,
    * don't compare key if either count is zero, since key may be garbage */
   DTCMP_Op cmp_count_nonzero, cmp_int_with_key;
   DTCMP_Op_create(MPI_INT, int_with_key_cmp_fn, &cmp_count_nonzero);
@@ -310,9 +310,15 @@ static int find_exact_splitters(
     int can_break = 1;
     for (i = 0; i < group_ranks; i++) {
       int N = *(int*) (out_num_with_median + i * size_int_with_key);
-      if (N <= 1) {
-        found_exact[i] = 1;
+
+      /* if we have a count of zero, there's no splitter */
+      if (N == 0) {
+        splitters_valid[i] = 0;
+        found_exact[i]     = 1;
       }
+
+      /* if we're above the threshold and we didn't find
+       * the splitter exactly, keep cutting */
       if (N > serial_search_threshold && !found_exact[i]) {
         can_break = 0;
       }
@@ -321,7 +327,7 @@ static int find_exact_splitters(
       break;
     }
 
-    /* compute counts of elements less-than, equal-to, and greater-than M */
+    /* compute local counts of elements less-than, equal-to, and greater-than M */
     for (i = 0; i < group_ranks; i++) {
       /* if we already found the split point for this range,
        * or if we don't have any active elements, go to next */
@@ -344,6 +350,8 @@ static int find_exact_splitters(
       counts[i*2+LT] = lowest - start_index;
       counts[i*2+EQ] = (highest + 1) - lowest;
     }
+
+    /* now get global counts across all procs */
     ranklist_allreduce_recursive(
       counts, all_counts, 2 * group_ranks, MPI_INT, MPI_SUM,
       group_rank, group_ranks, comm_ranklist, comm
@@ -427,6 +435,10 @@ static int find_exact_splitters(
     }
 
     /* TODO: this does not handle non-contig types */
+    printf("ERROR: Cannot support a range of values in cheng @ %s:%d",
+      __FILE__, __LINE__
+    );
+    fflush(stdout);
     exit(1);
 
 #if 0
@@ -507,11 +519,11 @@ static int find_exact_splitters(
 static int exact_split_exchange_merge(
   void* outbuf,
   int count,
-  void* splitters,
-  int splitters_valid[],
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  void* splitters,
+  int splitters_valid[],
   int group_rank,
   int group_ranks,
   const int comm_ranklist[],
@@ -554,7 +566,8 @@ static int exact_split_exchange_merge(
       }
     }
 
-    /* search for index values for these split points in our local data */
+    /* search for index values for these split points in our local data,
+     * note we have to have at least one splitter since count > 0 */
     DTCMP_Search_low_list_local(
       num_splitters, splitters_search, outbuf, 0, count-1,
       key, keysat, cmp, flags, indicies
@@ -623,6 +636,8 @@ static int exact_split_exchange_merge(
     senddispls[i] = senddisp;
     senddisp += sendcounts[i];
   }
+
+  /* TODO: assert that sum(recvounts) = count */
 
   /* get true extent of key with satellite */
   MPI_Aint keysat_true_lb, keysat_true_extent;
@@ -734,13 +749,15 @@ int DTCMP_Sortv_ranklist_cheng(
 
   /* compute global split points across all data */
   find_exact_splitters(
-    uniqbuf, count, uniqkey, uniqkeysat, uniqcmp, THRESH, splitters, valid,
+    uniqbuf, count, uniqkey, uniqkeysat, uniqcmp,
+    THRESH, splitters, valid,
     group_rank, group_ranks, comm_ranklist, comm
   );
 
   /* now split data, exchange, and merge */
   exact_split_exchange_merge(
-    uniqbuf, count, splitters, valid, uniqkey, uniqkeysat, uniqcmp,
+    uniqbuf, count, uniqkey, uniqkeysat, uniqcmp,
+    splitters, valid,
     group_rank, group_ranks, comm_ranklist, comm
   );
 
