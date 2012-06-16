@@ -89,7 +89,7 @@ int ranklist_alltoall_brucks(
     MPI_Waitall(2, request, status);
 
     /* unpack received data into our buffer */
-    void* recv_ptr = recv_data;
+    char* recv_ptr = recv_data;
     for (i = 0; i < group_ranks; i++) {
       int mask = (i & step);
       if (mask) {

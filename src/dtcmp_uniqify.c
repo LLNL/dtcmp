@@ -126,7 +126,7 @@ int dtcmp_uniqify(
   int i;
   char* new_buf = values->buf;
   for (i = 0; i < count; i++) {
-    const char* src = inbuf + i * keysat_true_extent;
+    const char* src = (char*)inbuf + i * keysat_true_extent;
     char* dst = new_buf + i * elem_size;
 
     /* copy the key */
@@ -177,7 +177,8 @@ int dtcmp_uniqify(
 
 int dtcmp_deuniqify(
   const void* buf, int count, MPI_Datatype key, MPI_Datatype keysat,
-  void* outbuf, MPI_Datatype outkey, MPI_Datatype outkeysat)
+  void* outbuf, MPI_Datatype outkey, MPI_Datatype outkeysat,
+  DTCMP_Handle* handle)
 {
   /* get unique key true extent */
   MPI_Aint key_true_lb, key_true_extent;
@@ -202,13 +203,16 @@ int dtcmp_deuniqify(
     dst += outkeysat_extent;
   }
 
+  /* free handle allocated during uniqify call */
+  DTCMP_Free(handle);
+
   return DTCMP_SUCCESS;
 }
 
 int dtcmp_deuniqifyz(
   const void* buf, int count, MPI_Datatype key, MPI_Datatype keysat,
   void** outbuf, MPI_Datatype outkey, MPI_Datatype outkeysat,
-  DTCMP_Handle* handle)
+  DTCMP_Handle* uniqhandle, DTCMP_Handle* handle)
 {
   /* get output keysat true extent */
   MPI_Aint outkeysat_true_lb, outkeysat_true_extent;
@@ -219,7 +223,7 @@ int dtcmp_deuniqifyz(
   dtcmp_handle_alloc_single(new_buf_size, outbuf, handle);
 
   /* copy original keysat into buffer */
-  dtcmp_deuniqify(buf, count, key, keysat, *outbuf, outkey, outkeysat);
+  dtcmp_deuniqify(buf, count, key, keysat, *outbuf, outkey, outkeysat, uniqhandle);
 
   return DTCMP_SUCCESS;
 }

@@ -45,7 +45,7 @@ static int find_splitters(
     char* samples = (char*) dtcmp_malloc(samples_size, 0, __FILE__, __LINE__);
     for (i = 0; i < s; i++) {
       int sample_index = (((i+1) * count) / s) - 1;
-      char* src = buf + sample_index * keysat_extent;
+      char* src = (char*)buf + sample_index * keysat_extent;
       char* dst = samples + i * key_extent;
       DTCMP_Memcpy(dst, 1, key, src, 1, key);
     }
@@ -75,7 +75,7 @@ static int find_splitters(
         for (i = 0; i < num_splitters; i++) {
           int splitter_index = (i+1) * s;
           char* src = all_samples + splitter_index * key_extent;
-          char* dst = splitters + i * key_extent;
+          char* dst = (char*)splitters + i * key_extent;
           DTCMP_Memcpy(dst, 1, key, src, 1, key);
         }
       }
@@ -325,13 +325,12 @@ int DTCMP_Sortz_samplesort(
     dtcmp_deuniqifyz(
       mergebuf, mergecount, tmpkey, tmpkeysat,
       outbuf, key, keysat,
-      handle
+      &uniq_handle, handle
     );
     *outcount = mergecount;
 
     /* free temporary handles we created along the way */
     DTCMP_Free(&merge_handle);
-    DTCMP_Free(&uniq_handle);
   } else {
     /* in this case, we just sorted directly with the caller's data,
      * but we need to free the copy of the input buffer, and return

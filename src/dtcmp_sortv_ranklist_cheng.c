@@ -109,49 +109,57 @@ static void compute_weighted_median(
 
   /* identify the weighted median */
   i = 0;
-  int before = 0;
-  int half = N / 2;
-  void* target = NULL;
+  int before_weight = 0;
+  int half_weight   = N / 2;
   char* ptr = all_num_with_median;
+  void* target = (void*) (ptr + sizeof(int));
   while(i < group_ranks) {
     /* set our target to the current median
      * and initialize our current weight */
     target = (void*) (ptr + sizeof(int));
-    int current = *(int*) ptr;
+    int current_weight = *(int*) ptr;
     i++;
     ptr += size_int_with_key;
 
     /* add weights for any elements which equal this current median */
-    int result;
-    int weight = *(int*) ptr;
-    if (weight > 0) {
-      result = dtcmp_op_eval(ptr + sizeof(int), target, keycmp);
-    } else {
-      result = 0;
-    }
-    while (i < group_ranks && result == 0) {
-      current += weight;
-      i++;
-      ptr += size_int_with_key;
-
-      weight = *(int*) ptr;
-      if (weight > 0) {
-        result = dtcmp_op_eval(ptr + sizeof(int), target, keycmp);
+    if (i < group_ranks) {
+      int result;
+      int next_weight = *(int*) ptr;
+      if (next_weight > 0) {
+        void* next_target = (void*) (ptr + sizeof(int));
+        result = dtcmp_op_eval(target, next_target, keycmp);
       } else {
         result = 0;
+      }
+      while (i < group_ranks && result == 0) {
+        /* current item is equal to target, add its weight */
+        current_weight += next_weight;
+        i++;
+        ptr += size_int_with_key;
+
+        /* get weight and comparison result of next item if one exists */
+        if (i < group_ranks) {
+          next_weight = *(int*) ptr;
+          if (next_weight > 0) {
+            void* next_target = (void*) (ptr + sizeof(int));
+            result = dtcmp_op_eval(target, next_target, keycmp);
+          } else {
+            result = 0;
+          }
+        }
       }
     }
 
     /* determine if the weight before and after this value are
      * each less than or equal to half */
-    int after = N - before - current;
-    if (before <= half && after <= half) {
+    int after_weight = N - before_weight - current_weight;
+    if (before_weight <= half_weight && after_weight <= half_weight) {
       break;
     }
 
     /* after was too heavy, so add current weight to before
      * and go to next value */
-    before += current;
+    before_weight += current_weight;
   }
 
   /* set total number of active elements,
@@ -169,7 +177,7 @@ static void compute_weighted_median(
   return;
 }
 
-static int find_splitters(
+static int find_exact_splitters(
   const void* data,
   int n,
   MPI_Datatype key,
@@ -177,6 +185,7 @@ static int find_splitters(
   DTCMP_Op cmp,
   int serial_search_threshold,
   void* splitters,
+  int splitters_valid[],
   int group_rank,
   int group_ranks,
   const int* comm_ranklist,
@@ -314,8 +323,9 @@ static int find_splitters(
 
     /* compute counts of elements less-than, equal-to, and greater-than M */
     for (i = 0; i < group_ranks; i++) {
-      /* if we already found the split point for this range, go to next */
-      if (found_exact[i]) {
+      /* if we already found the split point for this range,
+       * or if we don't have any active elements, go to next */
+      if (found_exact[i] || num[i] == 0) {
         counts[i*2+LT] = 0;
         counts[i*2+EQ] = 0;
         continue;
@@ -381,8 +391,8 @@ static int find_splitters(
   if (all_exact) {
     /* if we found all values exactly, then just copy them into array */
     for (i = 0; i < group_ranks; i++) {
-      int valid_splitter = *(int*) (out_num_with_median + i * size_int_with_key);
-      if (valid_splitter != 0) {
+      splitters_valid[i] = *(int*) (out_num_with_median + i * size_int_with_key);
+      if (splitters_valid[i] != 0) {
         memcpy(
           (char*)splitters + i * key_true_extent,
           out_num_with_median + i * size_int_with_key + sizeof(int),
@@ -491,13 +501,14 @@ static int find_splitters(
   dtcmp_free(&senddispls);
   dtcmp_free(&weighted_median_scratch);
 
-  return 0;
+  return DTCMP_SUCCESS;
 }
 
-int DTCMP_Sortv_ranklist_cheng(
-  const void* inbuf,
+static int exact_split_exchange_merge(
   void* outbuf,
   int count,
+  void* splitters,
+  int splitters_valid[],
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
@@ -508,95 +519,99 @@ int DTCMP_Sortv_ranklist_cheng(
 {
   int i;
 
-  /* get true extent of each element */
-  MPI_Aint keysat_true_lb, keysat_true_extent;
-  MPI_Type_get_true_extent(keysat, &keysat_true_lb, &keysat_true_extent);
-
-  /* get true extent of the keys */
-  MPI_Aint key_true_lb, key_true_extent;
-  MPI_Type_get_true_extent(key, &key_true_lb, &key_true_extent);
-
-  /* allocate some scratch space */
-
-  /* hold key for each process representing exact splitter,
-   * all items equal to or less than should be sent to corresponding proc */
-  void* splitters = dtcmp_malloc(group_ranks * key_true_extent, 0, __FILE__, __LINE__);
-
-  /* dummy array to hold flags in Search_low_list call */
-  int* flags = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
-
-  /* compute index in input buffer for each splitter */
-  int* indicies = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
-
   /* number of items we'll send to each proc */
   int* sendcounts = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
 
-  /* number of items we'll receive from each proc */
-  int* recvcounts = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
-
-  /* displacement for each of our send ranges */
-  int* senddispls = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
-
-  /* displacement for each of our receive ranges */
-  int* recvdispls = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
-
-  /* list of ranks in our group */
-  int* ranklist = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
-
-  /* pointer to set of items we receive from each proc */
-  const void** kbufs = dtcmp_malloc(group_ranks * sizeof(void*), 0, __FILE__, __LINE__);
-
-  /* number of items we receive from each proc */
-  int* ksizes = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
-
-  /* merge buffer to sort items we receive from each proc */
-  void* kbuf = dtcmp_malloc(count * keysat_true_extent, 0, __FILE__, __LINE__);
-
-  /* copy input data to output buffer if it's not already there */
-  if (inbuf != DTCMP_IN_PLACE) {
-    DTCMP_Memcpy(outbuf, count, keysat, inbuf, count, keysat);
+  /* set all send counts to zero */
+  for (i = 0; i < group_ranks; i++) {
+    sendcounts[i] = 0;
   }
 
-  /* compute global split points across all data */
-  find_splitters(
-    outbuf, count, key, keysat, cmp, THRESH, splitters,
-    group_rank, group_ranks, comm_ranklist, comm
-  );
-
+  /* if we have any elements, search for splitter locations and
+   * compute send counts for those elements */
   if (count > 0) {
+    /* get extent of key */
+    MPI_Aint key_lb, key_extent;
+    MPI_Type_get_extent(key, &key_lb, &key_extent);
+
+    /* get true extent of key */
+    MPI_Aint key_true_lb, key_true_extent;
+    MPI_Type_get_true_extent(key, &key_true_lb, &key_true_extent);
+
+    /* arrays to hold values in Search_low_list call */
+    char* splitters_search = dtcmp_malloc(group_ranks * key_true_extent, 0, __FILE__, __LINE__);
+    int* flags    = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+    int* indicies = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+
+    /* only consider valid splitters */
+    int num_splitters = 0;
+    for (i = 0; i < group_ranks; i++) {
+      if (splitters_valid[i]) {
+        char* src = (char*)splitters + i * key_extent;
+        char* dst = splitters_search + num_splitters * key_extent;
+        DTCMP_Memcpy(dst, 1, key, src, 1, key);
+        num_splitters++;
+      }
+    }
+
     /* search for index values for these split points in our local data */
     DTCMP_Search_low_list_local(
-      group_ranks, splitters, outbuf, 0, count-1,
+      num_splitters, splitters_search, outbuf, 0, count-1,
       key, keysat, cmp, flags, indicies
     );
 
-    /* set our send counts */
+    /* compute send counts based on indicies from search */
     i = 0;
-    int current_index = 0;
-    while (current_index < count && i < group_ranks-1) {
-      int next_index = indicies[i+1];
-      sendcounts[i] = next_index - current_index;
-      current_index = next_index;
-      i++;
-    }
-    sendcounts[i] = count - current_index;
-    i++;
+    int j = 0;
+    int start_index = 0;
     while (i < group_ranks) {
-      sendcounts[i] = 0;
-      i++;
+      if (splitters_valid[i]) {
+        /* there may be a non-zero count for this range, look for next
+         * valid splitter to get index */
+        start_index = indicies[j];
+        j++;
+
+        if (j < num_splitters) {
+          /* there's at least one more valid splitter out there,
+           * find its index */
+          int k = i + 1;
+          while (k < group_ranks && !splitters_valid[k]) {
+            k++;
+          }
+          sendcounts[i] = indicies[j] - start_index;
+          i = k;
+        } else {
+          /* no more valid splitters, assign whatever is left to
+           * this range */
+          sendcounts[i] = count - start_index;
+          i = group_ranks;
+        }
+      } else {
+        /* leave this range set to a 0 count */
+        i++;
+      }
     }
-  } else {
-    /* we don't have anything so set all send counts to zero */
-    for (i = 0; i < group_ranks; i++) {
-      sendcounts[i] = 0;
-    }
+
+    /* free memory used for splitter search */
+    dtcmp_free(&indicies);
+    dtcmp_free(&flags);
+    dtcmp_free(&splitters_search);
   }
+
+  /* number of items we'll receive from each proc */
+  int* recvcounts = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* inform other processes how many elements we'll be sending to each */
   ranklist_alltoall_brucks(
     sendcounts, recvcounts, 1, MPI_INT,
     group_rank, group_ranks, comm_ranklist, comm
   );
+
+  /* displacement for each of our send ranges */
+  int* senddispls = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+
+  /* displacement for each of our receive ranges */
+  int* recvdispls = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* build our displacement arrays for alltoallv call */
   int recvdisp = 0;
@@ -609,6 +624,13 @@ int DTCMP_Sortv_ranklist_cheng(
     senddisp += sendcounts[i];
   }
 
+  /* get true extent of key with satellite */
+  MPI_Aint keysat_true_lb, keysat_true_extent;
+  MPI_Type_get_true_extent(keysat, &keysat_true_lb, &keysat_true_extent);
+
+  /* merge buffer to sort items we receive from each proc */
+  void* kbuf = dtcmp_malloc(count * keysat_true_extent, 0, __FILE__, __LINE__);
+
   /* exchange data */
   char* recvdata = kbuf;
   ranklist_alltoallv_linear(
@@ -616,6 +638,12 @@ int DTCMP_Sortv_ranklist_cheng(
     recvdata, recvcounts, recvdispls,
     keysat, group_rank, group_ranks, comm_ranklist, comm
   );
+
+  /* pointer to set of items we receive from each proc */
+  const void** kbufs = dtcmp_malloc(group_ranks * sizeof(void*), 0, __FILE__, __LINE__);
+
+  /* number of items we receive from each proc */
+  int* ksizes = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* if we received any elements, sort them */
   if (recvdisp > 0) {
@@ -630,18 +658,100 @@ int DTCMP_Sortv_ranklist_cheng(
     DTCMP_Merge_local(group_ranks, kbufs, ksizes, outbuf, key, keysat, cmp);
   }
 
-  /* free our scratch space */
-  dtcmp_free(&splitters);
-  dtcmp_free(&indicies);
-  dtcmp_free(&flags);
-  dtcmp_free(&sendcounts);
-  dtcmp_free(&recvcounts);
-  dtcmp_free(&senddispls);
-  dtcmp_free(&recvdispls);
-  dtcmp_free(&ranklist);
-  dtcmp_free(&kbufs);
+  /* free memory */
   dtcmp_free(&ksizes);
+  dtcmp_free(&kbufs);
   dtcmp_free(&kbuf);
+  dtcmp_free(&recvdispls);
+  dtcmp_free(&senddispls);
+  dtcmp_free(&recvcounts);
+  dtcmp_free(&sendcounts);
+
+  return DTCMP_SUCCESS;
+}
+
+int DTCMP_Sortv_ranklist_cheng(
+  const void* inbuf,
+  void* outbuf,
+  int count,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  int group_rank,
+  int group_ranks,
+  const int comm_ranklist[],
+  MPI_Comm comm)
+{
+  /* TODO: currently only works if each process has at least one element */
+
+  /* TODO: incorporate scans to avoid this requirement */
+  /* ensure all elements are unique */
+  void* uniqbuf;
+  MPI_Datatype uniqkey, uniqkeysat;
+  DTCMP_Op uniqcmp;
+  DTCMP_Handle uniqhandle;
+
+  int input_not_unique = 1;
+  if (input_not_unique) {
+    /* determine which buffer input data is in */
+    const void* tmpbuf = inbuf;
+    if (inbuf == DTCMP_IN_PLACE) {
+      tmpbuf = outbuf;
+    }
+
+    /* tack on rank and original index to each item and return new key
+     * and keysat types along with new comparison op */
+    dtcmp_uniqify(
+      tmpbuf, count, key, keysat, cmp,
+      &uniqbuf, &uniqkey, &uniqkeysat, &uniqcmp,
+      comm, &uniqhandle
+    );
+  } else {
+    /* move data to output buffer */
+    if (inbuf != DTCMP_IN_PLACE) {
+      DTCMP_Memcpy(outbuf, count, keysat, inbuf, count, keysat);
+    }
+
+    /* set unique variables to point to output buffer and existing
+     * types */
+    uniqbuf    = outbuf;
+    uniqkey    = key;
+    uniqkeysat = keysat;
+    uniqcmp    = cmp;
+  }
+
+  /* local sort */
+  DTCMP_Sort_local(DTCMP_IN_PLACE, uniqbuf, count, uniqkey, uniqkeysat, uniqcmp);
+
+  /* get true extent of the keys */
+  MPI_Aint key_true_lb, key_true_extent;
+  MPI_Type_get_true_extent(uniqkey, &key_true_lb, &key_true_extent);
+
+  /* hold key for each process representing exact splitter,
+   * all items equal to or less than should be sent to corresponding proc */
+  void* splitters = dtcmp_malloc(group_ranks * key_true_extent, 0, __FILE__, __LINE__);
+  int*  valid     = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+
+  /* compute global split points across all data */
+  find_exact_splitters(
+    uniqbuf, count, uniqkey, uniqkeysat, uniqcmp, THRESH, splitters, valid,
+    group_rank, group_ranks, comm_ranklist, comm
+  );
+
+  /* now split data, exchange, and merge */
+  exact_split_exchange_merge(
+    uniqbuf, count, splitters, valid, uniqkey, uniqkeysat, uniqcmp,
+    group_rank, group_ranks, comm_ranklist, comm
+  );
+
+  /* strip off extra data we attached to ensure items are unique */
+  if (input_not_unique) {
+    dtcmp_deuniqify(uniqbuf, count, uniqkey, uniqkeysat, outbuf, key, keysat, &uniqhandle);
+  }
+
+  /* free our scratch space */
+  dtcmp_free(&valid);
+  dtcmp_free(&splitters);
 
   return 0;
 }

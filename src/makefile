@@ -1,8 +1,9 @@
-CC    = gcc
+CC    = icc
 MPICC = mpicc
 
 #MPI = -mpi=mvapich-gnu-debug-1.2
-OPT = -g -O0 -Wall -fPIC
+#OPT = -g -O0 -Wall -fPIC
+OPT = -g -O0 -fPIC
 
 #MPI = 
 #OPT = -g -O3 -Wall -fPIC
@@ -27,6 +28,7 @@ OBJS= \
   dtcmp_sort_bitonic.o \
   dtcmp_sortv_allgather.o \
   dtcmp_sortv_sortgather_scatter.o \
+  dtcmp_sortv_cheng.o \
   dtcmp_sortv_ranklist_cheng.o \
   dtcmp_sortz_samplesort.o \
   dtcmp_rankv_sort.o \

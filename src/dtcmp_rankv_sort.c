@@ -66,8 +66,8 @@ static int detect_edges(
   for (i = 1; i < num; i++) {
     /* if the left item is different from the right item,
     * mark the right item as the leader of a new group */
-    const void* left_data  = buf + (i-1) * size;
-    const void* right_data = buf + (i)   * size;
+    const char* left_data  = (char*)buf + (i-1) * size;
+    const char* right_data = (char*)buf + (i)   * size;
     int result = dtcmp_op_eval(left_data, right_data, cmp);
     if (result != 0) {
       first_in_group[i]  = 1;

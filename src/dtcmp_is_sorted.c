@@ -66,8 +66,8 @@ int DTCMP_Is_sorted_local(
 
     /* step through and check that all of our local items are in order */
     const char* item1 = buf;
-    const char* item2 = buf + extent;
-    const char* last_item = buf + extent * count;
+    const char* item2 = (char*)buf + extent;
+    const char* last_item = (char*)buf + extent * count;
     while (item2 < last_item) {
       if (dtcmp_op_eval(item1, item2, cmp) > 0) {
         sorted = 0;

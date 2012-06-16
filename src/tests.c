@@ -49,15 +49,17 @@ char* sort_names[NUM_SORT_FNS] = {
   "DTCMP_Sort_allgather",
 };
 
-#define NUM_SORTV_FNS (3)
+#define NUM_SORTV_FNS (4)
 sortv_fn sortv_fns[NUM_SORTV_FNS] = {
   DTCMP_Sortv,
   DTCMP_Sortv_allgather,
+  DTCMP_Sortv_cheng,
   DTCMP_Sortv_sortgather_scatter,
 };
 char* sortv_names[NUM_SORTV_FNS] = {
   "DTCMP_Sortv",
   "DTCMP_Sortv_allgather",
+  "DTCMP_Sortv_cheng",
   "DTCMP_Sortv_sortgather_scatter",
 };
 
@@ -249,7 +251,9 @@ int main(int argc, char* argv[])
  *   only rank 0 has zero items
  *   only rank N-1 has zero items
  *   every other proc has zero items
- *   randomly select procs with zero items
+ *   ** randomly select procs with zero items
+ *
+ *   ** repeat all of above with duplicates
  *
  *   items already in order
  *   items in reverse order
@@ -267,12 +271,13 @@ int main(int argc, char* argv[])
 
 
   int in_1int[SIZE], out_1int[SIZE];
+  inbuf  = (void*) in_1int;
+  outbuf = (void*) out_1int;
+
   for (i = 0; i < SIZE; i++) {
     in_1int[i] = -(i*10 + rank);
     out_1int[i] = 0;
   }
-  inbuf  = (void*) in_1int;
-  outbuf = (void*) out_1int;
 
   key    = MPI_INT;
   keysat = MPI_INT;
@@ -302,21 +307,54 @@ int main(int argc, char* argv[])
   op = DTCMP_OP_INT_DESCEND;
   test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
 
-
-  int in_2int[SIZE*2], out_2int[SIZE*2];
   for (i = 0; i < SIZE; i++) {
-    in_2int[i*2+0] = -(i*10 + rank);
-//    insatbuf[i*2+0] = 35 - (i%2);
-    in_2int[i*2+1] = +(i*10 + rank);
-    out_2int[i*2+0] = 0;
-    out_2int[i*2+1] = 0;
+    in_1int[i]  = 1;
+    out_1int[i] = 0;
   }
-  inbuf  = (void*) in_2int;
-  outbuf = (void*) out_2int;
+
+  /* test that all sorts work with count=0 on all procs */
+  size = 0;
+  test = "0 INT ASCEND DUP";
+  op = DTCMP_OP_INT_ASCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  /* test that all sorts work with count=1 on all procs */
+  size = 1;
+  test = "1 INT/INT ASCEND DUP";
+  op = DTCMP_OP_INT_ASCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "1 INT/INT DESCEND DUP";
+  op = DTCMP_OP_INT_DESCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  /* test that all sorts work with count>1 on all procs */
+  size = SIZE;
+  test = "SIZE INT/INT ASCEND DUP";
+  op = DTCMP_OP_INT_ASCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "SIZE INT/INT DESCEND DUP";
+  op = DTCMP_OP_INT_DESCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
 
   MPI_Datatype type_2int;
   MPI_Type_contiguous(2, MPI_INT, &type_2int);
   MPI_Type_commit(&type_2int);
+
+  DTCMP_Op cmp_updown, cmp_downdown;
+  DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_DESCEND, &cmp_updown);
+  DTCMP_Op_create_series(DTCMP_OP_INT_DESCEND, DTCMP_OP_INT_DESCEND, &cmp_downdown);
+
+  int in_2int[SIZE*2], out_2int[SIZE*2];
+  inbuf  = (void*) in_2int;
+  outbuf = (void*) out_2int;
+
+  for (i = 0; i < SIZE; i++) {
+    in_2int[i*2+0]  = -(i*10 + rank);
+    in_2int[i*2+1]  = +(i*10 + rank);
+    out_2int[i*2+0] = 0;
+    out_2int[i*2+1] = 0;
+  }
 
   key    = MPI_INT;
   keysat = type_2int;
@@ -345,10 +383,6 @@ int main(int argc, char* argv[])
   test = "SIZE INT/2INT DESCEND";
   op = DTCMP_OP_INT_DESCEND;
   test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
-
-  DTCMP_Op cmp_updown, cmp_downdown;
-  DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_DESCEND, &cmp_updown);
-  DTCMP_Op_create_series(DTCMP_OP_INT_DESCEND, DTCMP_OP_INT_DESCEND, &cmp_downdown);
 
   key    = type_2int;
   keysat = type_2int;
@@ -440,6 +474,134 @@ int main(int argc, char* argv[])
   op = DTCMP_OP_INT_ASCEND;
   test_variable_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
   test = "1-10,0 even INT/2INT DESCEND";
+  op = DTCMP_OP_INT_DESCEND;
+  test_variable_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  for (i = 0; i < SIZE; i++) {
+    in_2int[i*2+0]  = 1;
+    in_2int[i*2+1]  = 2;
+    out_2int[i*2+0] = 0;
+    out_2int[i*2+1] = 0;
+  }
+
+  key    = MPI_INT;
+  keysat = type_2int;
+  comm   = MPI_COMM_WORLD;
+
+  /* test that all sorts work with count=0 on all procs */
+  size = 0;
+  test = "0 INT/2INT ASCEND DUP";
+  op = DTCMP_OP_INT_ASCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  /* test that all sorts work with count=1 on all procs */
+  size = 1;
+  test = "1 INT/2INT ASCEND DUP";
+  op = DTCMP_OP_INT_ASCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "1 INT/2INT DESCEND DUP";
+  op = DTCMP_OP_INT_DESCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  /* test that all sorts work with count>1 on all procs */
+  size = SIZE;
+  test = "SIZE INT/2INT ASCEND DUP";
+  op = DTCMP_OP_INT_ASCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "SIZE INT/2INT DESCEND DUP";
+  op = DTCMP_OP_INT_DESCEND;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  key    = type_2int;
+  keysat = type_2int;
+  comm   = MPI_COMM_WORLD;
+
+  /* test that all sorts work with count=0 on all procs */
+  size = 0;
+  test = "0 2INT/2INT ASCEND DUP";
+  op = cmp_updown;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  /* test that all sorts work with count=1 on all procs */
+  size = 1;
+  test = "1 2INT/2INT ASCEND DUP";
+  op = cmp_updown;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "1 2INT/2INT DESCEND DUP";
+  op = cmp_downdown;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  /* test that all sorts work with count>1 on all procs */
+  size = SIZE;
+  test = "SIZE 2INT/2INT ASCEND DUP";
+  op = cmp_updown;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "SIZE 2INT/2INT DESCEND DUP";
+  op = cmp_downdown;
+  test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  key    = MPI_INT;
+  keysat = type_2int;
+  comm   = MPI_COMM_WORLD;
+
+  /* test variable counts across procs where 1 <= count <= 10 */
+  size = rank % 10 + 1;
+  if (size > SIZE) {
+    printf("Invalid size %d limit %d\n", size, SIZE);
+    return 1;
+  }
+  test = "1-10 INT/2INT ASCEND DUP";
+  op = DTCMP_OP_INT_ASCEND;
+  test_variable_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "1-10 INT/2INT DESCEND DUP";
+  op = DTCMP_OP_INT_DESCEND;
+  test_variable_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  /* test variable counts where count=0 on rank=0, 1 <= count <= 10 elsewhere */
+  size = rank % 10 + 1;
+  if (rank == 0) {
+    size = 0;
+  }
+  if (size > SIZE) {
+    printf("Invalid size %d limit %d\n", size, SIZE);
+    return 1;
+  }
+  test = "0,1-10 INT/2INT ASCEND DUP";
+  op = DTCMP_OP_INT_ASCEND;
+  test_variable_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "0,1-10 INT/2INT DESCEND DUP";
+  op = DTCMP_OP_INT_DESCEND;
+  test_variable_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  /* test variable counts where count=0 on rank=N-1, 1 <= count <= 10 elsewhere */
+  size = rank % 10 + 1;
+  if (rank == ranks-1) {
+    size = 0;
+  }
+  if (size > SIZE) {
+    printf("Invalid size %d limit %d\n", size, SIZE);
+    return 1;
+  }
+  test = "1-10,0 INT/2INT ASCEND DUP";
+  op = DTCMP_OP_INT_ASCEND;
+  test_variable_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "1-10,0 INT/2INT DESCEND DUP";
+  op = DTCMP_OP_INT_DESCEND;
+  test_variable_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+
+  /* test variable counts where count=0 on even ranks, 1 <= count <= 10 elsewhere */
+  size = rank % 10 + 1;
+  if (rank % 2 == 0) {
+    size = 0;
+  }
+  if (size > SIZE) {
+    printf("Invalid size %d limit %d\n", size, SIZE);
+    return 1;
+  }
+  test = "1-10,0 even INT/2INT ASCEND DUP";
+  op = DTCMP_OP_INT_ASCEND;
+  test_variable_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
+  test = "1-10,0 even INT/2INT DESCEND DUP";
   op = DTCMP_OP_INT_DESCEND;
   test_variable_sorts(test, inbuf, outbuf, size, key, keysat, op, comm);
 

@@ -94,18 +94,19 @@ int dtcmp_type_concat2(MPI_Datatype type1, MPI_Datatype type2, MPI_Datatype* new
 int dtcmp_uniqify(
   const void* buf, int count, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op cmp,
   void** outbuf, MPI_Datatype* outkey, MPI_Datatype* outkeysat, DTCMP_Op* outcmp,
-  MPI_Comm comm, DTCMP_Handle* handle
+  MPI_Comm comm, DTCMP_Handle* uniqhandle
 );
 
 int dtcmp_deuniqify(
   const void* buf, int count, MPI_Datatype key, MPI_Datatype keysat,
-  void* outbuf, MPI_Datatype outkey, MPI_Datatype outkeysat
+  void* outbuf, MPI_Datatype outkey, MPI_Datatype outkeysat,
+  DTCMP_Handle* uniqhandle
 );
 
 int dtcmp_deuniqifyz(
   const void* buf, int count, MPI_Datatype key, MPI_Datatype keysat,
   void** outbuf, MPI_Datatype outkey, MPI_Datatype outkeysat,
-  DTCMP_Handle* handle
+  DTCMP_Handle* uniqhandle, DTCMP_Handle* handle
 );
 
 typedef struct {
@@ -334,6 +335,16 @@ int DTCMP_Sortv_allgather(
 );
 
 int DTCMP_Sortv_sortgather_scatter(
+  const void* inbuf,
+  void* outbuf,
+  int count,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  MPI_Comm comm
+);
+
+int DTCMP_Sortv_cheng(
   const void* inbuf,
   void* outbuf,
   int count,

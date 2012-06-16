@@ -163,7 +163,7 @@ static int DTCMP_Sort_bitonic_merge_multiple(
           DTCMP_Memcpy(value, count, keysat, merge, count, keysat);
         } else {
           /* otherwise, take the upper half of the values */
-          void* target = merge + count * extent;
+          char* target = (char*)merge + count * extent;
           DTCMP_Memcpy(value, count, keysat, target, count, keysat);
         }
       }
@@ -189,7 +189,7 @@ static int DTCMP_Sort_bitonic_merge_multiple(
         DTCMP_Merge_local(2, bufs, counts, merge, key, keysat, cmp);
         if (direction) {
           /* if we're in the upper half of the procs and direction is increasing, take the upper half of the values */
-          void* target = merge + count * extent;
+          char* target = (char*)merge + count * extent;
           DTCMP_Memcpy(value, count, keysat, target, count, keysat);
         } else {
           /* otherwise, take the lower half of the values */
