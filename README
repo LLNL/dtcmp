@@ -38,9 +38,12 @@ have the following naming convention:
 
 where <TYPE> may be one of
 
+  SHORT            - C short
   INT              - C int
   LONG             - C long
   LONGLONG         - C long long
+  UNSIGNEDSHORT    - C unsigned short
+  UNSIGNEDINT      - C unsigned int
   UNSIGNEDLONG     - C unsigned long
   UNSIGNEDLONGLONG - C unsigned long long
   INT8T            - C int8_t
@@ -168,9 +171,39 @@ Currently, key and keysat datatypes must adhere to a certain set of
 constraints.  Namely, they cannot have holes, lb=0, extent > 0,
 extent=true extent, and extent=size.
 
+A common need is to sort strings, which may be of variable length.  An
+algorithm for this is to:
+
+1) define a string comparison function:
+   int my_strcmp(const void* a, const void& b) {
+     return strcmp((const char*)a, (const char*)b);
+   }
+
+2) determine maximum string length across all procs
+   int my_size = strlen(my_str) + 1;
+   MPI_Allreduce(&my_size, &max_size, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+
+3) allocate buffer of maximum length and copy string
+   char* my_new_str = malloc(max_size);
+   strcpy(my_new_str, my_str);
+
+4) create a type of the max length using MPI_Type_contigious:
+   MPI_Datatype my_type;
+   MPI_Type_contiguous(max_size, MPI_CHAR, &my_type);
+   MPI_Type_commit(&my_type);
+
+5) create a new DTCMP op with DTCMP_Op_create:
+   DTCMP_Op my_op;
+   DTCMP_Op_create(my_type, my_strcmp, &my_op);
+
+6) use copy of string, new type, and new op for all DTCMP calls
+
 TODO:
 Add mechanism to provide assertions in API:
   all_unique - caller ensures each key is globally unique
   stable - caller is requesting that sort is stable
   in_place - caller wants DTCMP to use in-place algorithms
 Routine to return communicator optimized for sorting
+Find way to support variable length keys (e.g., strings)
+Enable apps/libs to create DTCMP_Handles freeable via DTCMP_FREE
+  DTCMP_Handle_create(fn* my_delete, void* my_arg, DTCMP_Handle* out)

@@ -594,15 +594,6 @@ int DTCMP_Rankv_sort(
   return rc;
 }
 
-/* DTCMP_Op_fn to compare string a to string b */
-static int dtcmp_op_fn_string_ascend(const void* a, const void* b)
-{
-  const char* a_str = (const char*) a;
-  const char* b_str = (const char*) b;
-  int rc = strcmp(a_str, b_str);
-  return rc;
-}
-
 int DTCMP_Rankv_strings_sort(
   int count,
   const char* strings[],
@@ -644,7 +635,7 @@ int DTCMP_Rankv_strings_sort(
 
   /* build string comparison function */
   DTCMP_Op cmp_string;
-  DTCMP_Op_create(type_string, dtcmp_op_fn_string_ascend, &cmp_string);
+  DTCMP_Op_create(type_string, dtcmp_op_fn_strcmp_ascend, &cmp_string);
 
   /* rank items */
   int rc = DTCMP_Rankv_sort(

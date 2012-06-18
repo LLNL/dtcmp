@@ -43,12 +43,18 @@ DTCMP_Op DTCMP_OP_NULL = NULL;
 
 /* set predefined comparison ops to NULL now,
  * we'll fill these in during init */
+DTCMP_Op DTCMP_OP_SHORT_ASCEND  = NULL;
+DTCMP_Op DTCMP_OP_SHORT_DESCEND = NULL;
 DTCMP_Op DTCMP_OP_INT_ASCEND  = NULL;
 DTCMP_Op DTCMP_OP_INT_DESCEND = NULL;
 DTCMP_Op DTCMP_OP_LONG_ASCEND  = NULL;
 DTCMP_Op DTCMP_OP_LONG_DESCEND = NULL;
 DTCMP_Op DTCMP_OP_LONGLONG_ASCEND  = NULL;
 DTCMP_Op DTCMP_OP_LONGLONG_DESCEND = NULL;
+DTCMP_Op DTCMP_OP_UNSIGNEDSHORT_ASCEND  = NULL;
+DTCMP_Op DTCMP_OP_UNSIGNEDSHORT_DESCEND = NULL;
+DTCMP_Op DTCMP_OP_UNSIGNEDINT_ASCEND  = NULL;
+DTCMP_Op DTCMP_OP_UNSIGNEDINT_DESCEND = NULL;
 DTCMP_Op DTCMP_OP_UNSIGNEDLONG_ASCEND  = NULL;
 DTCMP_Op DTCMP_OP_UNSIGNEDLONG_DESCEND = NULL;
 DTCMP_Op DTCMP_OP_UNSIGNEDLONGLONG_ASCEND  = NULL;
@@ -174,12 +180,18 @@ int DTCMP_Init()
   MPI_Op_create(dtcmp_reducefn_uint64t_min_max_sum, commutative, &dtcmp_reduceop_mms_3uint64t);
 
   /* setup predefined cmp handles */
+  DTCMP_Op_create(MPI_SHORT, dtcmp_op_fn_short_ascend,  &DTCMP_OP_SHORT_ASCEND);
+  DTCMP_Op_create(MPI_SHORT, dtcmp_op_fn_short_descend, &DTCMP_OP_SHORT_DESCEND);
   DTCMP_Op_create(MPI_INT, dtcmp_op_fn_int_ascend,  &DTCMP_OP_INT_ASCEND);
   DTCMP_Op_create(MPI_INT, dtcmp_op_fn_int_descend, &DTCMP_OP_INT_DESCEND);
   DTCMP_Op_create(MPI_LONG, dtcmp_op_fn_long_ascend,  &DTCMP_OP_LONG_ASCEND);
   DTCMP_Op_create(MPI_LONG, dtcmp_op_fn_long_descend, &DTCMP_OP_LONG_DESCEND);
   DTCMP_Op_create(MPI_LONG_LONG, dtcmp_op_fn_longlong_ascend,  &DTCMP_OP_LONGLONG_ASCEND);
   DTCMP_Op_create(MPI_LONG_LONG, dtcmp_op_fn_longlong_descend, &DTCMP_OP_LONGLONG_DESCEND);
+  DTCMP_Op_create(MPI_UNSIGNED_SHORT, dtcmp_op_fn_unsignedshort_ascend,  &DTCMP_OP_UNSIGNEDSHORT_ASCEND);
+  DTCMP_Op_create(MPI_UNSIGNED_SHORT, dtcmp_op_fn_unsignedshort_descend, &DTCMP_OP_UNSIGNEDSHORT_DESCEND);
+  DTCMP_Op_create(MPI_UNSIGNED, dtcmp_op_fn_unsignedint_ascend,  &DTCMP_OP_UNSIGNEDINT_ASCEND);
+  DTCMP_Op_create(MPI_UNSIGNED, dtcmp_op_fn_unsignedint_descend, &DTCMP_OP_UNSIGNEDINT_DESCEND);
   DTCMP_Op_create(MPI_UNSIGNED_LONG, dtcmp_op_fn_unsignedlong_ascend,  &DTCMP_OP_UNSIGNEDLONG_ASCEND);
   DTCMP_Op_create(MPI_UNSIGNED_LONG, dtcmp_op_fn_unsignedlong_descend, &DTCMP_OP_UNSIGNEDLONG_DESCEND);
   DTCMP_Op_create(MPI_UNSIGNED_LONG_LONG, dtcmp_op_fn_unsignedlonglong_ascend,  &DTCMP_OP_UNSIGNEDLONGLONG_ASCEND);
@@ -241,12 +253,18 @@ int DTCMP_Finalize()
   DTCMP_Op_free(&DTCMP_OP_UNSIGNEDLONGLONG_ASCEND);
   DTCMP_Op_free(&DTCMP_OP_UNSIGNEDLONG_DESCEND);
   DTCMP_Op_free(&DTCMP_OP_UNSIGNEDLONG_ASCEND);
+  DTCMP_Op_free(&DTCMP_OP_UNSIGNEDINT_DESCEND);
+  DTCMP_Op_free(&DTCMP_OP_UNSIGNEDINT_ASCEND);
+  DTCMP_Op_free(&DTCMP_OP_UNSIGNEDSHORT_DESCEND);
+  DTCMP_Op_free(&DTCMP_OP_UNSIGNEDSHORT_ASCEND);
   DTCMP_Op_free(&DTCMP_OP_LONGLONG_DESCEND);
   DTCMP_Op_free(&DTCMP_OP_LONGLONG_ASCEND);
   DTCMP_Op_free(&DTCMP_OP_LONG_DESCEND);
   DTCMP_Op_free(&DTCMP_OP_LONG_ASCEND);
   DTCMP_Op_free(&DTCMP_OP_INT_DESCEND);
   DTCMP_Op_free(&DTCMP_OP_INT_ASCEND);
+  DTCMP_Op_free(&DTCMP_OP_SHORT_DESCEND);
+  DTCMP_Op_free(&DTCMP_OP_SHORT_ASCEND);
 
   if (dtcmp_reduceop_mms_3uint64t != MPI_OP_NULL) {
     MPI_Op_free(&dtcmp_reduceop_mms_3uint64t);

@@ -33,12 +33,18 @@ void dtcmp_op_copy(DTCMP_Op* dst, DTCMP_Op src);
 
 int dtcmp_op_eval(const void* a, const void* b, DTCMP_Op cmp);
 
+int dtcmp_op_fn_short_ascend(const void*, const void*);
+int dtcmp_op_fn_short_descend(const void*, const void*);
 int dtcmp_op_fn_int_ascend(const void*, const void*);
 int dtcmp_op_fn_int_descend(const void*, const void*);
 int dtcmp_op_fn_long_ascend(const void*, const void*);
 int dtcmp_op_fn_long_descend(const void*, const void*);
 int dtcmp_op_fn_longlong_ascend(const void*, const void*);
 int dtcmp_op_fn_longlong_descend(const void*, const void*);
+int dtcmp_op_fn_unsignedshort_ascend(const void*, const void*);
+int dtcmp_op_fn_unsignedshort_descend(const void*, const void*);
+int dtcmp_op_fn_unsignedint_ascend(const void*, const void*);
+int dtcmp_op_fn_unsignedint_descend(const void*, const void*);
 int dtcmp_op_fn_unsignedlong_ascend(const void*, const void*);
 int dtcmp_op_fn_unsignedlong_descend(const void*, const void*);
 int dtcmp_op_fn_unsignedlonglong_ascend(const void*, const void*);
@@ -65,3 +71,15 @@ int dtcmp_op_fn_double_ascend(const void*, const void*);
 int dtcmp_op_fn_double_descend(const void*, const void*);
 int dtcmp_op_fn_longdouble_ascend(const void*, const void*);
 int dtcmp_op_fn_longdouble_descend(const void*, const void*);
+
+/* TODO: would like to support variable length data somehow,
+ * and strings in particular, but the create function
+ * requires that we know the extent, perhaps need a flag
+ * to allow for variable length data so that eval function
+ * returns extents in addition to flag */
+int dtcmp_op_fn_strcmp_ascend(const void*, const void*);
+int dtcmp_op_fn_strcmp_descend(const void*, const void*);
+/*
+int dtcmp_op_fn_strcasecmp_ascend(const void*, const void*);
+int dtcmp_op_fn_strcasecmp_descend(const void*, const void*);
+*/

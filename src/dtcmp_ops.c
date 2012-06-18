@@ -7,6 +7,7 @@
  * For details, see https://github.com/hpc/dtcmp
  * Please also read this file: LICENSE.TXT. */
 
+#include <string.h>
 #include "mpi.h"
 #include "dtcmp_internal.h"
 #include "dtcmp_ops.h"
@@ -88,6 +89,36 @@ int dtcmp_op_eval(const void* a, const void* b, DTCMP_Op cmp)
   }
 }
 
+/* -----------------------------------------
+ * Comaprison routines for pre-defined ops
+ * ----------------------------------------- */
+
+int dtcmp_op_fn_short_ascend(const void* bufa, const void* bufb)
+{
+  short a = *(short*)bufa;
+  short b = *(short*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_short_descend(const void* bufa, const void* bufb)
+{
+  short a = *(short*)bufa;
+  short b = *(short*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
 int dtcmp_op_fn_int_ascend(const void* bufa, const void* bufb)
 {
   int a = *(int*)bufa;
@@ -157,6 +188,58 @@ int dtcmp_op_fn_longlong_descend(const void* bufa, const void* bufb)
 {
   long long a = *(long long*)bufa;
   long long b = *(long long*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_unsignedshort_ascend(const void* bufa, const void* bufb)
+{
+  unsigned short a = *(unsigned short*)bufa;
+  unsigned short b = *(unsigned short*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_unsignedshort_descend(const void* bufa, const void* bufb)
+{
+  unsigned short a = *(unsigned short*)bufa;
+  unsigned short b = *(unsigned short*)bufb;
+  if (a > b) {
+    return -1;
+  } else if (b > a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_unsignedint_ascend(const void* bufa, const void* bufb)
+{
+  unsigned int a = *(unsigned int*)bufa;
+  unsigned int b = *(unsigned int*)bufb;
+  if (a < b) {
+    return -1;
+  } else if (b < a) {
+    return  1;
+  } else {
+    return 0;
+  }
+}
+
+int dtcmp_op_fn_unsignedint_descend(const void* bufa, const void* bufb)
+{
+  unsigned int a = *(unsigned int*)bufa;
+  unsigned int b = *(unsigned int*)bufb;
   if (a > b) {
     return -1;
   } else if (b > a) {
@@ -499,6 +582,36 @@ int dtcmp_op_fn_longdouble_descend(const void* bufa, const void* bufb)
     return -1;
   } else if (b > a) {
     return  1;
+  } else {
+    return 0;
+  }
+}
+
+/* DTCMP_Op_fn to compare string a to string b */
+int dtcmp_op_fn_strcmp_ascend(const void* a, const void* b)
+{
+  const char* a_str = (const char*) a;
+  const char* b_str = (const char*) b;
+  int rc = strcmp(a_str, b_str);
+  if (rc < 0) {
+    return -1;
+  } else if (rc > 0) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+/* DTCMP_Op_fn to compare string a to string b */
+int dtcmp_op_fn_strcmp_descend(const void* a, const void* b)
+{
+  const char* a_str = (const char*) a;
+  const char* b_str = (const char*) b;
+  int rc = strcmp(a_str, b_str);
+  if (rc < 0) {
+    return 1;
+  } else if (rc > 0) {
+    return -1;
   } else {
     return 0;
   }
