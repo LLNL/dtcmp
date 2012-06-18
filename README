@@ -171,8 +171,10 @@ Currently, key and keysat datatypes must adhere to a certain set of
 constraints.  Namely, they cannot have holes, lb=0, extent > 0,
 extent=true extent, and extent=size.
 
-A common need is to sort strings, which may be of variable length.  An
-algorithm for this is to:
+A common need is to sort strings, which may be of variable length.
+Since the keys are variable length, there are not predefined operations
+to handle strings.  However, one may still sort strings using an
+algorithm like the following:
 
 1) define a string comparison function:
    int my_strcmp(const void* a, const void& b) {
@@ -196,7 +198,7 @@ algorithm for this is to:
    DTCMP_Op my_op;
    DTCMP_Op_create(my_type, my_strcmp, &my_op);
 
-6) use copy of string, new type, and new op for all DTCMP calls
+6) use copy of string, new type, and new op in any DTCMP calls
 
 TODO:
 Add mechanism to provide assertions in API:
