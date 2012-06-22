@@ -14,7 +14,7 @@
 
 /* initialize operation handle with explicit byte displacement */
 void dtcmp_op_hinit(
-  uint32_t type,
+  dtcmp_op_types type,
   MPI_Datatype key,
   DTCMP_Op_fn fn,
   MPI_Aint cmpdisp,
@@ -37,7 +37,7 @@ void dtcmp_op_hinit(
 
 /* initialize operation handle with extent(key) */
 void dtcmp_op_init(
-  uint32_t type,
+  dtcmp_op_types type,
   MPI_Datatype key,
   DTCMP_Op_fn fn,
   DTCMP_Op series,

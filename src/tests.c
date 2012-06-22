@@ -276,6 +276,10 @@ int main(int argc, char* argv[])
   DTCMP_Flags hints = DTCMP_FLAG_NONE;
   MPI_Comm comm;
 
+DTCMP_Op series1, series2, series;
+DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_LONG_ASCEND, &series1);
+DTCMP_Op_create_series(DTCMP_OP_FLOAT_ASCEND, DTCMP_OP_DOUBLE_ASCEND, &series2);
+DTCMP_Op_create_series(series1, series2, &series);
 
   int in_1int[SIZE], out_1int[SIZE];
   inbuf  = (void*) in_1int;

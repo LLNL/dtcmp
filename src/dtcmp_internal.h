@@ -25,7 +25,8 @@
 typedef struct {
   uint32_t magic;   /* special integer value which we can use to verify
                      * that handle appears valid */
-  uint32_t type;    /* type of DTCMP handle */
+  dtcmp_op_types type; /* type of DTCMP handle, currently only used to
+                        * know whether we can call qsort */
   MPI_Datatype key; /* datatype of items being compared */
   DTCMP_Op_fn fn;   /* comparison function pointer */
   MPI_Aint cmpdisp; /* byte displacement from current pointer to first

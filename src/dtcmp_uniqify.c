@@ -104,9 +104,6 @@ int dtcmp_uniqify(
   /* TODO: just copy input params to output and return if inhints have unique bit set */
   *outhints = inhints | DTCMP_FLAG_UNIQUE;
 
-  /* DTCMP_OP_create_hseries(first, cmp_offset, series_offset, second, cmp) 
-   * or provide all functions with separate key and sat types so we can pull them apart */
-
   /* get key true extent */
   MPI_Aint key_true_lb, key_true_extent;
   MPI_Type_get_true_extent(inkey, &key_true_lb, &key_true_extent);
@@ -115,9 +112,27 @@ int dtcmp_uniqify(
   MPI_Aint keysat_true_lb, keysat_true_extent;
   MPI_Type_get_true_extent(inkeysat, &keysat_true_lb, &keysat_true_extent);
 
+  /* check whether caller is specifying that values are unique to some
+   * degree */
+  int unique_globally = (inhints & DTCMP_FLAG_UNIQUE);
+  int unique_locally  = (inhints & DTCMP_FLAG_UNIQUE_LOCAL);
+
+  /* determine size of each element after ensuring it's unique */
+  size_t elem_size;
+  if (unique_globally) {
+    /* if each item is already globally unique, just use the item */
+    elem_size = keysat_true_extent;
+  } else if (unique_locally) {
+    /* just need to tack on the rank if items are at least locally
+     * unique */
+    elem_size = key_true_extent + 1 * sizeof(int) + keysat_true_extent;
+  } else {
+    /* in this case, add the rank and the original index */
+    elem_size = key_true_extent + 2 * sizeof(int) + keysat_true_extent;
+  }
+
   /* allocate buffer to hold new elements (key, rank, index, keysat) */
   dtcmp_handle_uniqify_t* values;
-  size_t elem_size = key_true_extent + 2 * sizeof(int) + keysat_true_extent;
   size_t new_buf_size = count * elem_size;
   dtcmp_handle_alloc_uniqify(new_buf_size, &values, handle);
 
@@ -125,24 +140,28 @@ int dtcmp_uniqify(
   int rank;
   MPI_Comm_rank(comm, &rank);
 
-  /* copy (rank,index,keysat) into new buffer */
+  /* copy (key,rank,index,keysat) into new buffer */
   int i;
   char* new_buf = values->buf;
   for (i = 0; i < count; i++) {
     const char* src = (char*)inbuf + i * keysat_true_extent;
     char* dst = new_buf + i * elem_size;
 
-    /* copy the key */
-    DTCMP_Memcpy(dst, 1, inkey, src, 1, inkey);
-    dst += key_true_extent;
+    if (! unique_globally) {
+      /* copy the key */
+      DTCMP_Memcpy(dst, 1, inkey, src, 1, inkey);
+      dst += key_true_extent;
 
-    /* copy the rank */
-    memcpy(dst, &rank, sizeof(int));
-    dst += sizeof(int);
+      /* copy the rank */
+      memcpy(dst, &rank, sizeof(int));
+      dst += sizeof(int);
 
-    /* copy the index */
-    memcpy(dst, &i, sizeof(int));
-    dst += sizeof(int);
+      /* copy the index if needed */
+      if (! unique_locally) {
+        memcpy(dst, &i, sizeof(int));
+        dst += sizeof(int);
+      }
+    }
 
     /* copy the keysat */
     DTCMP_Memcpy(dst, 1, inkeysat, src, 1, inkeysat);
@@ -150,24 +169,46 @@ int dtcmp_uniqify(
 
   MPI_Datatype types[4];
 
-  /* build new key type */
-  types[0] = inkey;
-  types[1] = MPI_INT;
-  types[2] = MPI_INT;
-  dtcmp_type_concat(3, types, &values->key);
+  /* build new types and comparison operations */
+  if (unique_globally) {
+    /* items are already unique, just duplicate everything */
+    MPI_Type_dup(inkey,    &values->key);
+    MPI_Type_dup(inkeysat, &values->keysat);
+    DTCMP_Op_dup(incmp, &values->cmp); 
+  } else if (unique_locally) {
+    /* build new key type (key, rank) */
+    types[0] = inkey;
+    types[1] = MPI_INT;
+    dtcmp_type_concat(2, types, &values->key);
 
-  /* build new keysat type */
-  types[0] = inkey;
-  types[1] = MPI_INT;
-  types[2] = MPI_INT;
-  types[3] = inkeysat;
-  dtcmp_type_concat(4, types, &values->keysat);
+    /* build new keysat type (key, rank, keysat) */
+    types[0] = inkey;
+    types[1] = MPI_INT;
+    types[2] = inkeysat;
+    dtcmp_type_concat(3, types, &values->keysat);
 
-  /* build new comparison op */
-  DTCMP_Op cmp_2int;
-  DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_ASCEND, &cmp_2int);
-  DTCMP_Op_create_series(incmp, cmp_2int, &values->cmp);
-  DTCMP_Op_free(&cmp_2int);
+    /* build new comparison op, key then rank */
+    DTCMP_Op_create_series(incmp, DTCMP_OP_INT_ASCEND, &values->cmp);
+  } else {
+    /* build new key type (key, rank, index) */
+    types[0] = inkey;
+    types[1] = MPI_INT;
+    types[2] = MPI_INT;
+    dtcmp_type_concat(3, types, &values->key);
+
+    /* build new keysat type (key, rank, index, keysat) */
+    types[0] = inkey;
+    types[1] = MPI_INT;
+    types[2] = MPI_INT;
+    types[3] = inkeysat;
+    dtcmp_type_concat(4, types, &values->keysat);
+
+    /* build new comparison op, key then rank then index */
+    DTCMP_Op cmp_2int;
+    DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_ASCEND, &cmp_2int);
+    DTCMP_Op_create_series(incmp, cmp_2int, &values->cmp);
+    DTCMP_Op_free(&cmp_2int);
+  }
 
   /* set output parameters */
   *outbuf    = values->buf;

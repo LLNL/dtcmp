@@ -302,6 +302,20 @@ int DTCMP_Finalize()
   return DTCMP_SUCCESS;
 }
 
+/* make a full copy of a comparison operation */
+int DTCMP_Op_dup(DTCMP_Op cmp, DTCMP_Op* newcmp)
+{
+  /* check parameters */
+  if (newcmp == NULL) {
+    return DTCMP_FAILURE;
+  }
+
+  /* make a copy of cmp in newcmp */
+  dtcmp_op_copy(newcmp, cmp);
+
+  return DTCMP_SUCCESS;
+}
+
 /* create a user-defined comparison operation, associate compare function
  * pointer and datatype of key */
 int DTCMP_Op_create(MPI_Datatype key, DTCMP_Op_fn fn, DTCMP_Op* cmp)
@@ -329,13 +343,22 @@ int DTCMP_Op_create_series(DTCMP_Op first, DTCMP_Op second, DTCMP_Op* cmp)
     return DTCMP_FAILURE;
   }
 
-  /* make a full copy of the second compare operation */
+  /* copy the first into cmp */
+  dtcmp_op_copy(cmp, first);
+
+  /* traverse to last in series of first */
+  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*)(*cmp);
+  while (c->series != DTCMP_OP_NULL) {
+    c = (dtcmp_op_handle_t*)(c->series);
+  }
+
+  /* set this item to OP_SERIES */
+  c->type = DTCMP_OP_TYPE_SERIES;
+
+  /* make a full copy of the second op and attach it */
   DTCMP_Op copy;
   dtcmp_op_copy(&copy, second);
-
-  /* now build a new comparison type using the key and fn of the first and add in second */
-  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) first;
-  dtcmp_op_init(DTCMP_OP_TYPE_SERIES, c->key, c->fn, copy, cmp);
+  c->series = copy;
 
   return DTCMP_SUCCESS;
 }
@@ -349,13 +372,28 @@ int DTCMP_Op_create_hseries(DTCMP_Op first, MPI_Aint cmpdisp, MPI_Aint disp, DTC
     return DTCMP_FAILURE;
   }
 
-  /* make a full copy of the second compare operation */
+  /* copy the first into cmp */
+  dtcmp_op_copy(cmp, first);
+
+  /* set the cmpdisp value */
+  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*)(*cmp);
+  c->cmpdisp = cmpdisp;
+
+  /* traverse to last in series of first, and count off our
+   * displacement as we go */
+  while (c->series != DTCMP_OP_NULL) {
+    disp -= c->disp;
+    c = (dtcmp_op_handle_t*)(c->series);
+  }
+
+  /* set this item to OP_SERIES and adjust the displacement */
+  c->type = DTCMP_OP_TYPE_SERIES;
+  c->disp = disp;
+
+  /* make a full copy of the second op and attach it */
   DTCMP_Op copy;
   dtcmp_op_copy(&copy, second);
-
-  /* now build a new comparison type using the key and fn of the first and add in second */
-  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) first;
-  dtcmp_op_hinit(DTCMP_OP_TYPE_SERIES, c->key, c->fn, cmpdisp, disp, copy, cmp);
+  c->series = copy;
 
   return DTCMP_SUCCESS;
 }

@@ -7,13 +7,22 @@
  * For details, see https://github.com/hpc/dtcmp
  * Please also read this file: LICENSE.TXT. */
 
+#ifndef DTCMP_OPS_H_
+#define DTCMP_OPS_H_
+
 #include "dtcmp_internal.h"
 
+typedef enum dtcmp_op_types_enum {
+  DTCMP_OP_TYPE_BASIC  = 1,
+  DTCMP_OP_TYPE_SERIES = 2,
+} dtcmp_op_types;
+#if 0
 #define DTCMP_OP_TYPE_BASIC  (1)
 #define DTCMP_OP_TYPE_SERIES (2)
+#endif
 
 void dtcmp_op_hinit(
-  uint32_t type,
+  dtcmp_op_types type,
   MPI_Datatype key,
   DTCMP_Op_fn fn,
   MPI_Aint cmpdisp,
@@ -23,7 +32,7 @@ void dtcmp_op_hinit(
 );
 
 void dtcmp_op_init(
-  uint32_t type,
+  dtcmp_op_types type,
   MPI_Datatype key,
   DTCMP_Op_fn fn,
   DTCMP_Op series,
@@ -84,3 +93,5 @@ int dtcmp_op_fn_strcmp_descend(const void*, const void*);
 int dtcmp_op_fn_strcasecmp_ascend(const void*, const void*);
 int dtcmp_op_fn_strcasecmp_descend(const void*, const void*);
 */
+
+#endif /* DTCMP_OPS_H_ */

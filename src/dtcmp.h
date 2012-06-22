@@ -129,6 +129,12 @@ extern DTCMP_Op DTCMP_OP_DOUBLE_DESCEND;
 extern DTCMP_Op DTCMP_OP_LONGDOUBLE_ASCEND;
 extern DTCMP_Op DTCMP_OP_LONGDOUBLE_DESCEND;
 
+/* make a full copy of a comparison operation */
+int DTCMP_Op_dup(
+  DTCMP_Op cmp,     /* IN  - comparison op to be copied (handle) */
+  DTCMP_Op* newcmp  /* OUT - comparison operation (handle) */
+);
+
 /* create a user-defined comparison operation,
  * associate datatype of key and compare function with handle */
 int DTCMP_Op_create(
