@@ -18,20 +18,21 @@ static int dtcmp_select_local_randpartition_keys(
   int k,
   void* item,
   MPI_Datatype key,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   /* randomly pick a pivot value */
   int pivot = rand_r(&dtcmp_rand_seed) % num;
 
   /* partition around this value, and determine the rank of the pivot value */
   int pivot_rank;
-  DTCMP_Partition_local_dtcpy(buf, num, pivot, &pivot_rank, key, key, cmp);
+  DTCMP_Partition_local_dtcpy(buf, num, pivot, &pivot_rank, key, key, cmp, hints);
 
   /* compare the rank of the pivot to the target rank we're looking for */
   if (k < pivot_rank) {
     /* the item is smaller than the pivot, so recurse into lower half of array */
     int num_left = pivot_rank;
-    int rc = dtcmp_select_local_randpartition_keys(buf, num_left, k, item, key, cmp);
+    int rc = dtcmp_select_local_randpartition_keys(buf, num_left, k, item, key, cmp, hints);
     return rc;
   } else if (k > pivot_rank) {
     /* the item is larger than the pivot, so recurse into upper half of array */
@@ -45,7 +46,7 @@ static int dtcmp_select_local_randpartition_keys(
     char* offset = (char*)buf + after_pivot * extent;
     int num_left = num - after_pivot;
     int new_k    = k - after_pivot;
-    int rc = dtcmp_select_local_randpartition_keys(offset, num_left, new_k, item, key, cmp);
+    int rc = dtcmp_select_local_randpartition_keys(offset, num_left, new_k, item, key, cmp, hints);
     return rc;
   } else { /* k == pivot_rank */
     /* in this case, the pivot rank is the target rank we're looking for,
@@ -69,7 +70,8 @@ int DTCMP_Select_local_randpartition(
   void* item,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   int rc = DTCMP_SUCCESS;
 
@@ -98,7 +100,7 @@ int DTCMP_Select_local_randpartition(
   }
 
   /* find and copy target rank into item */
-  dtcmp_select_local_randpartition_keys(scratch, num, k, item, key, cmp);
+  dtcmp_select_local_randpartition_keys(scratch, num, k, item, key, cmp, hints);
 
   /* free memory */
   dtcmp_free(&scratch);

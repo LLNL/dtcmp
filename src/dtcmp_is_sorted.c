@@ -51,6 +51,7 @@ int DTCMP_Is_sorted_local(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   int* flag)
 {
   int rc = DTCMP_SUCCESS;
@@ -90,6 +91,7 @@ int DTCMP_Is_sorted(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm,
   int* flag)
 {
@@ -105,7 +107,7 @@ int DTCMP_Is_sorted(
   MPI_Comm_size(comm, &ranks);
 
   /* first, step through and check that all of our local items are in order */
-  DTCMP_Is_sorted_local(buf, count, key, keysat, cmp, &sorted);
+  DTCMP_Is_sorted_local(buf, count, key, keysat, cmp, hints, &sorted);
 
   /* bail out at this point if ranks == 1 */
   if (ranks <= 1) {

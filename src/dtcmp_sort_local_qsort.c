@@ -18,7 +18,8 @@ int DTCMP_Sort_local_qsort(
   int count,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   /* get a pointer to our comparison op struct */
   dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) cmp;

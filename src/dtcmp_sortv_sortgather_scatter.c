@@ -220,6 +220,7 @@ int dtcmp_sortv_merge_tree(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm,
   gather_scatter_state_t* state)
 {
@@ -259,7 +260,7 @@ int dtcmp_sortv_merge_tree(
 
   /* copy our input data to send buffer buffer and sort it */
   DTCMP_Memcpy(send_buf, count, keysat, inbuf, count, keysat);
-  DTCMP_Sort_local(DTCMP_IN_PLACE, send_buf, count, key, keysat, cmp);
+  DTCMP_Sort_local(DTCMP_IN_PLACE, send_buf, count, key, keysat, cmp, hints);
 
   /* gather data to sorters (and sort the data as it is gathered) */
   int send_count = count;
@@ -290,7 +291,7 @@ int dtcmp_sortv_merge_tree(
           int counts[2];
           counts[0] = send_count;
           counts[1] = recv_count;
-          DTCMP_Merge_local(2, inbufs, counts, merge_buf, key, keysat, cmp);
+          DTCMP_Merge_local(2, inbufs, counts, merge_buf, key, keysat, cmp, hints);
 
           /* swap our send buffer with our merge buffer */
           void* tmp_buf = send_buf;
@@ -447,6 +448,7 @@ int DTCMP_Sortv_sortgather_scatter(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
   /* determine our rank and the number of ranks in our group */
@@ -456,7 +458,7 @@ int DTCMP_Sortv_sortgather_scatter(
 
   /* don't bother with all of this mess if we only have a single rank */
   if (ranks < 2) {
-    return DTCMP_Sort_local(inbuf, outbuf, count, key, keysat, cmp);
+    return DTCMP_Sort_local(inbuf, outbuf, count, key, keysat, cmp, hints);
   }
 
   /* get pointer to input data */
@@ -471,12 +473,12 @@ int DTCMP_Sortv_sortgather_scatter(
    * in the gather_scatter_state variable */
   size_t max_mem = 100*1024*1024;
   gather_scatter_state_t state;
-  dtcmp_sortv_merge_tree(max_mem, databuf, count, key, keysat, cmp, comm, &state);
+  dtcmp_sortv_merge_tree(max_mem, databuf, count, key, keysat, cmp, hints, comm, &state);
 
   /* parallel sort over subset */
   if (state.sort_ranks > 1 && state.sorter) {
     DTCMP_Sortv_ranklist_cheng(
-      DTCMP_IN_PLACE, state.buf, state.count, key, keysat, cmp,
+      DTCMP_IN_PLACE, state.buf, state.count, key, keysat, cmp, hints,
       state.sort_rank, state.sort_ranks, state.sort_group, comm
     );
   }

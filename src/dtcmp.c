@@ -342,7 +342,7 @@ int DTCMP_Op_create_series(DTCMP_Op first, DTCMP_Op second, DTCMP_Op* cmp)
 
 /* create a series comparison which executes the first comparison operation
  * and then the second if the first evaluates to equal */
-int DTCMP_Op_create_hseries(DTCMP_Op first, MPI_Aint disp, DTCMP_Op second, DTCMP_Op* cmp)
+int DTCMP_Op_create_hseries(DTCMP_Op first, MPI_Aint cmpdisp, MPI_Aint disp, DTCMP_Op second, DTCMP_Op* cmp)
 {
   /* check parameters */
   if (cmp == NULL) {
@@ -355,7 +355,7 @@ int DTCMP_Op_create_hseries(DTCMP_Op first, MPI_Aint disp, DTCMP_Op second, DTCM
 
   /* now build a new comparison type using the key and fn of the first and add in second */
   dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) first;
-  dtcmp_op_hinit(DTCMP_OP_TYPE_SERIES, c->key, c->fn, disp, copy, cmp);
+  dtcmp_op_hinit(DTCMP_OP_TYPE_SERIES, c->key, c->fn, cmpdisp, disp, copy, cmp);
 
   return DTCMP_SUCCESS;
 }
@@ -421,6 +421,7 @@ int DTCMP_Search_low_local(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   int* flag,
   int* index)
 {
@@ -435,7 +436,7 @@ int DTCMP_Search_low_local(
     return DTCMP_FAILURE;
   }
 
-  return DTCMP_Search_low_local_binary(target, list, low, high, key, keysat, cmp, flag, index);
+  return DTCMP_Search_low_local_binary(target, list, low, high, key, keysat, cmp, hints, flag, index);
 }
 
 int DTCMP_Search_high_local(
@@ -446,6 +447,7 @@ int DTCMP_Search_high_local(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   int* flag,
   int* index)
 {
@@ -460,7 +462,7 @@ int DTCMP_Search_high_local(
     return DTCMP_FAILURE;
   }
 
-  return DTCMP_Search_high_local_binary(target, list, low, high, key, keysat, cmp, flag, index);
+  return DTCMP_Search_high_local_binary(target, list, low, high, key, keysat, cmp, hints, flag, index);
 }
 
 int DTCMP_Search_low_list_local(
@@ -472,6 +474,7 @@ int DTCMP_Search_low_list_local(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   int flags[],
   int indicies[])
 {
@@ -489,7 +492,7 @@ int DTCMP_Search_low_list_local(
     return DTCMP_FAILURE;
   }
 
-  return DTCMP_Search_low_list_local_binary(num, targets, list, low, high, key, keysat, cmp, flags, indicies);
+  return DTCMP_Search_low_list_local_binary(num, targets, list, low, high, key, keysat, cmp, hints, flags, indicies);
 }
 
 int DTCMP_Partition_local(
@@ -499,7 +502,8 @@ int DTCMP_Partition_local(
   int* outpivot,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   /* check parameters */
   if (count < 0) {
@@ -518,7 +522,7 @@ int DTCMP_Partition_local(
   /* TODO: if we determine key and keysat don't have holes,
    * we could call the memcpy routine instead */
 
-  return DTCMP_Partition_local_dtcpy(buf, count, inpivot, outpivot, key, keysat, cmp);
+  return DTCMP_Partition_local_dtcpy(buf, count, inpivot, outpivot, key, keysat, cmp, hints);
 }
 
 int DTCMP_Merge_local(
@@ -528,7 +532,8 @@ int DTCMP_Merge_local(
   void* outbuf,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   /* check parameters */
   if (num < 2) {
@@ -546,10 +551,10 @@ int DTCMP_Merge_local(
 
   if (num == 2) {
     /* O(N) time */
-    return DTCMP_Merge_local_2way(num, inbufs, counts, outbuf, key, keysat, cmp);
+    return DTCMP_Merge_local_2way(num, inbufs, counts, outbuf, key, keysat, cmp, hints);
   } else {
     /* O(log(num) * N) time */
-    return DTCMP_Merge_local_kway_heap(num, inbufs, counts, outbuf, key, keysat, cmp);
+    return DTCMP_Merge_local_kway_heap(num, inbufs, counts, outbuf, key, keysat, cmp, hints);
   }
 }
 
@@ -560,7 +565,8 @@ int DTCMP_Select_local(
   void* item,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   /* check parameters */
   if (num <= 0) {
@@ -583,11 +589,63 @@ int DTCMP_Select_local(
    * the minimum or maximum, which we can do in a single sweep
    * with minimal memory copies */
   if (k == 0 || k == num-1) {
-    return DTCMP_Select_local_ends(buf, num, k, item, key, keysat, cmp);
+    return DTCMP_Select_local_ends(buf, num, k, item, key, keysat, cmp, hints);
   }
 
   /* otherwise use random pivot partitioning to narrow down on target rank */
-  return DTCMP_Select_local_randpartition(buf, num, k, item, key, keysat, cmp);
+  return DTCMP_Select_local_randpartition(buf, num, k, item, key, keysat, cmp, hints);
+}
+
+int DTCMP_Selectv(
+  const void* buf,
+  int num,
+  int k,
+  void* item,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Comm comm)
+{
+  /* check parameters */
+  if (num <= 0) {
+    return DTCMP_FAILURE;
+  }
+  if (buf == NULL || item == NULL) {
+    return DTCMP_FAILURE;
+  }
+  if (! dtcmp_type_is_valid(key)) {
+    return DTCMP_FAILURE;
+  }
+  if (! dtcmp_type_is_valid(keysat)) {
+    return DTCMP_FAILURE;
+  }
+
+#if 0
+  /* execute allreduce to compute min/max counts per process,
+   * and sum of all elements */ 
+  uint64_t min, max, sum;
+  dtcmp_get_uint64t_min_max_sum(count, &min, &max, &sum, comm);
+
+  /* check that k is in range */
+  if (k < 0 || k >= sum) {
+    return DTCMP_FAILURE;
+  }
+
+  /* if k == 0 or k == num-1, special case this by finding
+   * the minimum or maximum, which we can do in a single sweep
+   * with minimal memory copies */
+  if (k == 0 || k == sum-1) {
+    return DTCMP_Select_local_ends(buf, num, k, item, key, keysat, cmp, hints);
+  }
+
+#endif
+
+  /* TODO: add Christian Siebert's median selection, which can be cleanly done
+   * with allreduce and split operations (to exclude procs with 0 counts) */
+
+  /* otherwise use random pivot partitioning to narrow down on target rank */
+  return DTCMP_Selectv_medianofmedians(buf, num, k, item, key, keysat, cmp, hints, comm);
 }
 
 /* execute a purely local sort */
@@ -597,7 +655,8 @@ int DTCMP_Sort_local(
   int count,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   /* check parameters */
   if (count < 0) {
@@ -615,14 +674,14 @@ int DTCMP_Sort_local(
 
   /* TODO: select algorithm based on number of elements */
 
-  return DTCMP_Sort_local_randquicksort(inbuf, outbuf, count, key, keysat, cmp);
-  return DTCMP_Sort_local_insertionsort(inbuf, outbuf, count, key, keysat, cmp);
-  return DTCMP_Sort_local_mergesort(inbuf, outbuf, count, key, keysat, cmp);
+  return DTCMP_Sort_local_randquicksort(inbuf, outbuf, count, key, keysat, cmp, hints);
+  return DTCMP_Sort_local_insertionsort(inbuf, outbuf, count, key, keysat, cmp, hints);
+  return DTCMP_Sort_local_mergesort(inbuf, outbuf, count, key, keysat, cmp, hints);
 
   /* if keysat is valid type and if function is basic, we can just call qsort */
   dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) cmp;
   if (c->type == DTCMP_OP_TYPE_BASIC) {
-    return DTCMP_Sort_local_qsort(inbuf, outbuf, count, key, keysat, cmp);
+    return DTCMP_Sort_local_qsort(inbuf, outbuf, count, key, keysat, cmp, hints);
   }
 }
 
@@ -633,6 +692,7 @@ int DTCMP_Sort(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
   /* check parameters */
@@ -653,7 +713,7 @@ int DTCMP_Sort(
   int ranks;
   MPI_Comm_size(comm, &ranks);
   if (ranks < 2) {
-    return DTCMP_Sort_local(inbuf, outbuf, count, key, keysat, cmp);
+    return DTCMP_Sort_local(inbuf, outbuf, count, key, keysat, cmp, hints);
   }
 
   /* execute allreduce to compute min/max counts per process,
@@ -668,7 +728,7 @@ int DTCMP_Sort(
 
   /* TODO: pick algorithm based on number of items */
 
-  return DTCMP_Sort_allgather(inbuf, outbuf, count, key, keysat, cmp, comm);
+  return DTCMP_Sort_allgather(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
 }
 
 int DTCMP_Sortv(
@@ -678,6 +738,7 @@ int DTCMP_Sortv(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
   /* check parameters */
@@ -698,7 +759,7 @@ int DTCMP_Sortv(
   int ranks;
   MPI_Comm_size(comm, &ranks);
   if (ranks < 2) {
-    return DTCMP_Sort_local(inbuf, outbuf, count, key, keysat, cmp);
+    return DTCMP_Sort_local(inbuf, outbuf, count, key, keysat, cmp, hints);
   }
 
   /* execute allreduce to compute min/max counts per process,
@@ -713,14 +774,14 @@ int DTCMP_Sortv(
 
   /* if min==max, then just invoke Sort() routine */
   if (min == max) {
-    return DTCMP_Sort(inbuf, outbuf, count, key, keysat, cmp, comm);
+    return DTCMP_Sort(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
   }
 
   /* if sum(counts) is small gather to one task */
 
   /* if we have any elements, invoke the sortv routines */
-  return DTCMP_Sortv_sortgather_scatter(inbuf, outbuf, count, key, keysat, cmp, comm);
-  return DTCMP_Sortv_allgather(inbuf, outbuf, count, key, keysat, cmp, comm);
+  return DTCMP_Sortv_sortgather_scatter(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
+  return DTCMP_Sortv_allgather(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
 }
 
 int DTCMP_Sortz(
@@ -731,6 +792,7 @@ int DTCMP_Sortz(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm, 
   DTCMP_Handle* handle)
 {
@@ -763,7 +825,7 @@ int DTCMP_Sortz(
   /* for now, we can only use sample sort if min==max */
   if (min == max) {
     /* TODO: if number of elements per process is small, call bitonic sort */
-    return DTCMP_Sortz_samplesort(inbuf, count, outbuf, outcount, key, keysat, cmp, comm, handle);
+    return DTCMP_Sortz_samplesort(inbuf, count, outbuf, outcount, key, keysat, cmp, hints, comm, handle);
   }
 
   /* otherwise, force things into a Sortv but where we allocate and
@@ -772,7 +834,7 @@ int DTCMP_Sortz(
   MPI_Type_get_true_extent(keysat, &keysat_true_lb, &keysat_true_extent);
   size_t outbuf_size = count * keysat_true_extent;
   dtcmp_handle_alloc_single(outbuf_size, outbuf, handle);
-  DTCMP_Sortv(inbuf, *outbuf, count, key, keysat, cmp, comm);
+  DTCMP_Sortv(inbuf, *outbuf, count, key, keysat, cmp, hints, comm);
   *outcount = count;
 
   return DTCMP_FAILURE;
@@ -788,6 +850,7 @@ int DTCMP_Rankv(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
   /* check parameters */
@@ -807,7 +870,7 @@ int DTCMP_Rankv(
   return DTCMP_Rankv_sort(
     count, buf,
     groups, group_id, group_ranks, group_rank,
-    key, keysat, cmp, comm
+    key, keysat, cmp, hints, comm
   );
 }
 
@@ -818,6 +881,7 @@ int DTCMP_Rankv_strings(
   int  group_id[],
   int  group_ranks[],
   int  group_rank[],
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
   /* check parameters */
@@ -828,5 +892,5 @@ int DTCMP_Rankv_strings(
     return DTCMP_FAILURE;
   }
 
-  return DTCMP_Rankv_strings_sort(count, strings, groups, group_id, group_ranks, group_rank, comm);
+  return DTCMP_Rankv_strings_sort(count, strings, groups, group_id, group_ranks, group_rank, hints, comm);
 }

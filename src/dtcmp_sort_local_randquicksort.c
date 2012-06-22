@@ -16,7 +16,8 @@ static int DTCMP_Sort_local_randquicksort_scratch(
   void* scratch,
   int num,
   size_t size,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   /* already sorted if we have 1 or fewer elements */
   if (num <= 1) {
@@ -30,16 +31,16 @@ static int DTCMP_Sort_local_randquicksort_scratch(
   int pivot = rand_r(&dtcmp_rand_seed) % num;
 
   /* parition items in buf around pivot */
-  int index = dtcmp_partition_local_memcpy(buf, scratch, pivot, num, size, cmp);
+  int index = dtcmp_partition_local_memcpy(buf, scratch, pivot, num, size, cmp, hints);
 
   /* sort items less than pivot */
   int lowcount = index;
-  DTCMP_Sort_local_randquicksort_scratch(buf, scratch, lowcount, size, cmp);
+  DTCMP_Sort_local_randquicksort_scratch(buf, scratch, lowcount, size, cmp, hints);
 
   /* sort items larger than pivot */
   int highcount = num - index - 1;
   void* highbuf = (char*)buf + (index + 1) * size;
-  DTCMP_Sort_local_randquicksort_scratch(highbuf, scratch, highcount, size, cmp);
+  DTCMP_Sort_local_randquicksort_scratch(highbuf, scratch, highcount, size, cmp, hints);
 
   return DTCMP_SUCCESS;
 }
@@ -51,7 +52,8 @@ int DTCMP_Sort_local_randquicksort(
   int count,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   int rc = DTCMP_FAILURE;
 
@@ -69,7 +71,7 @@ int DTCMP_Sort_local_randquicksort(
 
     /* execute our merge sort */
     size_t size = extent;
-    rc = DTCMP_Sort_local_randquicksort_scratch(outbuf, scratch, count, size, cmp);
+    rc = DTCMP_Sort_local_randquicksort_scratch(outbuf, scratch, count, size, cmp, hints);
 
     /* free scratch space */
     dtcmp_free(&scratch);

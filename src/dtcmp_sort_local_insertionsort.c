@@ -17,7 +17,8 @@ int DTCMP_Sort_local_insertionsort(
   int count,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   int rc = DTCMP_FAILURE;
 

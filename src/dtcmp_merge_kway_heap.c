@@ -12,14 +12,14 @@
 
 /* merges k sorted lists into into single sorted list using a min-heap merge */
 int DTCMP_Merge_local_kway_heap(
-  int k,                /* IN  - number of input buffers (integer) */
-  const void* inbufs[], /* IN  - start of each input buffer (array of length num) */ 
-  int counts[],         /* IN  - number of items in each buffer (array of length num) */
-  void* outbuf,         /* OUT - output buffer (large enough to hold sum of counts) */
-  MPI_Datatype key,     /* IN  - datatype of key */
-  MPI_Datatype keysat,  /* IN  - datatype of key and satellite */
-  DTCMP_Op cmp          /* IN  - key comparison function (handle) */
-)
+  int k,
+  const void* inbufs[],
+  int counts[],
+  void* outbuf,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   /* setup a pointer to march through elements in output buffer */
   char* out = (char*)outbuf;

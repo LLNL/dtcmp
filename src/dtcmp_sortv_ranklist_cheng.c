@@ -72,6 +72,7 @@ static void compute_weighted_median(
   DTCMP_Op keycmp,
   MPI_Datatype type_int_with_key,
   DTCMP_Op cmp_int_with_key,
+  DTCMP_Flags hints,
   int group_rank,
   int group_ranks,
   const int* comm_ranklist,
@@ -97,7 +98,7 @@ static void compute_weighted_median(
   /* sort by medians value (ensuring that count is non-zero) */
   DTCMP_Sort_local(
     DTCMP_IN_PLACE, all_num_with_median, group_ranks,
-    type_int_with_key, type_int_with_key, cmp_int_with_key
+    type_int_with_key, type_int_with_key, cmp_int_with_key, hints
   );
 
   /* compute total number of elements */
@@ -183,6 +184,7 @@ static int find_exact_splitters(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   int serial_search_threshold,
   void* splitters,
   int splitters_valid[],
@@ -301,7 +303,7 @@ static int find_exact_splitters(
      * of active elements, N */
     compute_weighted_median(
       (const void*)my_num_with_median, (void*)out_num_with_median, weighted_median_scratch,
-      key, cmp, type_int_with_key, cmp_int_with_key,
+      key, cmp, type_int_with_key, cmp_int_with_key, hints,
       group_rank, group_ranks, comm_ranklist, comm
     );
 
@@ -345,8 +347,8 @@ static int find_exact_splitters(
       int start_index = index[i];
       int end_index   = index[i] + num[i] - 1;
       int flag, lowest, highest;
-      DTCMP_Search_low_local(target,  data, start_index, end_index, key, keysat, cmp, &flag, &lowest);
-      DTCMP_Search_high_local(target, data, lowest,      end_index, key, keysat, cmp, &flag, &highest);
+      DTCMP_Search_low_local(target,  data, start_index, end_index, key, keysat, cmp, hints, &flag, &lowest);
+      DTCMP_Search_high_local(target, data, lowest,      end_index, key, keysat, cmp, hints, &flag, &highest);
       counts[i*2+LT] = lowest - start_index;
       counts[i*2+EQ] = (highest + 1) - lowest;
     }
@@ -522,6 +524,7 @@ static int exact_split_exchange_merge(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   void* splitters,
   int splitters_valid[],
   int group_rank,
@@ -570,7 +573,7 @@ static int exact_split_exchange_merge(
      * note we have to have at least one splitter since count > 0 */
     DTCMP_Search_low_list_local(
       num_splitters, splitters_search, outbuf, 0, count-1,
-      key, keysat, cmp, flags, indicies
+      key, keysat, cmp, hints, flags, indicies
     );
 
     /* compute send counts based on indicies from search */
@@ -670,7 +673,7 @@ static int exact_split_exchange_merge(
       ksizes[i] = elements;
       koffset += elements * keysat_true_extent;
     }
-    DTCMP_Merge_local(group_ranks, kbufs, ksizes, outbuf, key, keysat, cmp);
+    DTCMP_Merge_local(group_ranks, kbufs, ksizes, outbuf, key, keysat, cmp, hints);
   }
 
   /* free memory */
@@ -692,36 +695,31 @@ int DTCMP_Sortv_ranklist_cheng(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   int group_rank,
   int group_ranks,
   const int comm_ranklist[],
   MPI_Comm comm)
 {
-  /* TODO: currently only works if each process has at least one element */
+  /* algorithm
+   * 1) sort local data
+   * 2) find P exact splitters using median-of-medians method
+   *    requires log N rounds of alltoall/allgather
+   * 3) identify split points in local data
+   * 4) send data to final process with alltoall/alltoallv
+   * 5) merge data into final sorted order */
 
   /* TODO: incorporate scans to avoid this requirement */
   /* ensure all elements are unique */
   void* uniqbuf;
   MPI_Datatype uniqkey, uniqkeysat;
   DTCMP_Op uniqcmp;
+  DTCMP_Flags uniqhints;
   DTCMP_Handle uniqhandle;
 
-  int input_not_unique = 1;
-  if (input_not_unique) {
-    /* determine which buffer input data is in */
-    const void* tmpbuf = inbuf;
-    if (inbuf == DTCMP_IN_PLACE) {
-      tmpbuf = outbuf;
-    }
-
-    /* tack on rank and original index to each item and return new key
-     * and keysat types along with new comparison op */
-    dtcmp_uniqify(
-      tmpbuf, count, key, keysat, cmp,
-      &uniqbuf, &uniqkey, &uniqkeysat, &uniqcmp,
-      comm, &uniqhandle
-    );
-  } else {
+  /* determine whether input items are unique */
+  int input_unique = (hints & DTCMP_FLAG_UNIQUE);
+  if (input_unique) {
     /* move data to output buffer */
     if (inbuf != DTCMP_IN_PLACE) {
       DTCMP_Memcpy(outbuf, count, keysat, inbuf, count, keysat);
@@ -733,10 +731,25 @@ int DTCMP_Sortv_ranklist_cheng(
     uniqkey    = key;
     uniqkeysat = keysat;
     uniqcmp    = cmp;
+    uniqhints  = hints;
+  } else {
+    /* determine which buffer input data is in */
+    const void* tmpbuf = inbuf;
+    if (inbuf == DTCMP_IN_PLACE) {
+      tmpbuf = outbuf;
+    }
+
+    /* tack on rank and original index to each item and return new key
+     * and keysat types along with new comparison op */
+    dtcmp_uniqify(
+      tmpbuf, count, key, keysat, cmp, hints,
+      &uniqbuf, &uniqkey, &uniqkeysat, &uniqcmp, &uniqhints,
+      comm, &uniqhandle
+    );
   }
 
   /* local sort */
-  DTCMP_Sort_local(DTCMP_IN_PLACE, uniqbuf, count, uniqkey, uniqkeysat, uniqcmp);
+  DTCMP_Sort_local(DTCMP_IN_PLACE, uniqbuf, count, uniqkey, uniqkeysat, uniqcmp, uniqhints);
 
   /* get true extent of the keys */
   MPI_Aint key_true_lb, key_true_extent;
@@ -749,20 +762,20 @@ int DTCMP_Sortv_ranklist_cheng(
 
   /* compute global split points across all data */
   find_exact_splitters(
-    uniqbuf, count, uniqkey, uniqkeysat, uniqcmp,
+    uniqbuf, count, uniqkey, uniqkeysat, uniqcmp, uniqhints,
     THRESH, splitters, valid,
     group_rank, group_ranks, comm_ranklist, comm
   );
 
   /* now split data, exchange, and merge */
   exact_split_exchange_merge(
-    uniqbuf, count, uniqkey, uniqkeysat, uniqcmp,
+    uniqbuf, count, uniqkey, uniqkeysat, uniqcmp, uniqhints,
     splitters, valid,
     group_rank, group_ranks, comm_ranklist, comm
   );
 
   /* strip off extra data we attached to ensure items are unique */
-  if (input_not_unique) {
+  if (! input_unique) {
     dtcmp_deuniqify(uniqbuf, count, uniqkey, uniqkeysat, outbuf, key, keysat, &uniqhandle);
   }
 

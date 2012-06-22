@@ -17,7 +17,8 @@ static int dtcmp_sort_local_mergesort_scratch(
   void* scratch,
   int count,
   size_t size,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   /* already sorted if we have 1 or fewer elements */
   if (count <= 1) {
@@ -37,9 +38,9 @@ static int dtcmp_sort_local_mergesort_scratch(
   bufs[1] = (char*)buf + counts[0] * size;
 
   /* sort each half and merge them back together */
-  dtcmp_sort_local_mergesort_scratch(bufs[0], scratch, counts[0], size, cmp);
-  dtcmp_sort_local_mergesort_scratch(bufs[1], scratch, counts[1], size, cmp);
-  dtcmp_merge_local_2way_memcpy(2, (const void**)bufs, counts, scratch, size, cmp);
+  dtcmp_sort_local_mergesort_scratch(bufs[0], scratch, counts[0], size, cmp, hints);
+  dtcmp_sort_local_mergesort_scratch(bufs[1], scratch, counts[1], size, cmp, hints);
+  dtcmp_merge_local_2way_memcpy(2, (const void**)bufs, counts, scratch, size, cmp, hints);
 
   /* copy data from scratch back to our buffer */
   memcpy(buf, scratch, count * size);
@@ -54,7 +55,8 @@ int DTCMP_Sort_local_mergesort(
   int count,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   int rc = DTCMP_FAILURE;
 
@@ -72,7 +74,7 @@ int DTCMP_Sort_local_mergesort(
 
     /* execute our merge sort */
     size_t size = (size_t) extent;
-    rc = dtcmp_sort_local_mergesort_scratch(outbuf, scratch, count, size, cmp);
+    rc = dtcmp_sort_local_mergesort_scratch(outbuf, scratch, count, size, cmp, hints);
 
     /* free scratch space */
     dtcmp_free(&scratch);

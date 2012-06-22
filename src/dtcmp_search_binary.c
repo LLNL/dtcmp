@@ -10,16 +10,16 @@
 #include "dtcmp_internal.h"
 
 int DTCMP_Search_low_local_binary(
-  const void* target,  /* IN  - buffer holding target key */
-  const void* list,    /* IN  - buffer holding ordered list of key/satellite items to search */
-  int low,             /* IN  - number of items in list (non-negative integer) */
-  int high,            /* IN  - number of items in list (non-negative integer) */
-  MPI_Datatype key,    /* IN  - datatype of key (handle) */
-  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
-  DTCMP_Op cmp,        /* IN  - key comparison function (handle) */
-  int* flag,           /* OUT - set to 1 if target is in list, 0 otherwise (integer) */
-  int* index           /* OUT - lowest index in list where target could be inserted (integer) */
-)
+  const void* target,
+  const void* list,
+  int low,
+  int high,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  int* flag,
+  int* index)
 {
   /* assume that we won't find the target */
   *flag = 0;
@@ -70,16 +70,16 @@ int DTCMP_Search_low_local_binary(
 }
 
 int DTCMP_Search_high_local_binary(
-  const void* target,  /* IN  - buffer holding target key */
-  const void* list,    /* IN  - buffer holding ordered list of key/satellite items to search */
-  int low,             /* IN  - number of items in list (non-negative integer) */
-  int high,            /* IN  - number of items in list (non-negative integer) */
-  MPI_Datatype key,    /* IN  - datatype of key (handle) */
-  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
-  DTCMP_Op cmp,        /* IN  - key comparison function (handle) */
-  int* flag,           /* OUT - set to 1 if target is in list, 0 otherwise (integer) */
-  int* index           /* OUT - highest index in list after which target could be inserted (integer) */
-)
+  const void* target,
+  const void* list,
+  int low,
+  int high,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  int* flag,
+  int* index)
 {
   /* assume that we won't find the target */
   *flag = 0;
@@ -131,17 +131,17 @@ int DTCMP_Search_high_local_binary(
 
 /* calls DTCMP_Search_low for an ordered list of targets and returns each corresponding index */
 int DTCMP_Search_low_list_local_binary(
-  int num,             /* IN  - number of targets (integer) */
-  const void* targets, /* IN  - array holding target keys */
-  const void* list,    /* IN  - array holding ordered list of key/satellite items to search */
-  int low,             /* IN  - number of items in list (non-negative integer) */
-  int high,            /* IN  - number of items in list (non-negative integer) */
-  MPI_Datatype key,    /* IN  - datatype of key (handle) */
-  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
-  DTCMP_Op cmp,        /* IN  - key comparison function (handle) */
-  int flags[],         /* OUT - lowest index in list where target could be inserted (integer) */
-  int indicies[]       /* OUT - lowest index in list where target could be inserted (integer) */
-)
+  int num,
+  const void* targets,
+  const void* list,
+  int low,
+  int high,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  int flags[],
+  int indicies[])
 {
   /* get size of an element so we can increase our pointer by the correct amount */
   MPI_Aint target_lb, target_extent;
@@ -151,7 +151,7 @@ int DTCMP_Search_low_list_local_binary(
   int flag, index;
   int mid = num / 2;
   const void* target = (char*)targets + mid * target_extent;
-  DTCMP_Search_low_local_binary(target, list, low, high, key, keysat, cmp, &flag, &index);
+  DTCMP_Search_low_local_binary(target, list, low, high, key, keysat, cmp, hints, &flag, &index);
   flags[mid] = flag;
   indicies[mid] = index;
 
@@ -166,7 +166,7 @@ int DTCMP_Search_low_list_local_binary(
   if (mid > 0) {
     DTCMP_Search_low_list_local_binary(
       mid, targets, list, low, index,
-      key, keysat, cmp, flags, indicies
+      key, keysat, cmp, hints, flags, indicies
     );
   }
 
@@ -176,7 +176,7 @@ int DTCMP_Search_low_list_local_binary(
   if (upper_count > 0) {
     DTCMP_Search_low_list_local_binary(
       upper_count, (char*)targets + upper_index * target_extent, list, index, high,
-      key, keysat, cmp, flags + upper_index, indicies + upper_index
+      key, keysat, cmp, hints, flags + upper_index, indicies + upper_index
     );
   }
   

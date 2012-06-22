@@ -16,6 +16,7 @@ void dtcmp_op_hinit(
   uint32_t type,
   MPI_Datatype key,
   DTCMP_Op_fn fn,
+  MPI_Aint cmpdisp,
   MPI_Aint disp,
   DTCMP_Op series,
   DTCMP_Op* cmp

@@ -73,9 +73,9 @@ its satellite data.  The first is often named "key" and the second
 "keysat".  The key datatype is used to infer the type and size of the
 key when comparing key values.  This can be exploited to select
 optimized comparison routines, e.g., radix sort on integers, and it
-enables the library to siphon and only process the key component if
-needed.  The keysat type is needed to copy items in memory or transfer
-an item between processes.
+enables the library to siphon off and only process the key component if
+needed.  The keysat type is needed to copy full items in memory or
+transfer items between processes.
 
 As an example use case for DTCMP, consider a problem in which each
 process in MPI_COMM_WORLD has 10 items, each consisting of an integer
@@ -89,8 +89,10 @@ sort and redistribute these items across the communicator like so:
   MPI_Type_contiguous(2, MPI_INT, &keysat);
   MPI_Type_commit(&keysat);
 
-  DTCMP_Sort(inbuf, outbuf, 10, MPI_INT, keysat,
-    DTCMP_OP_INT_ASCEND, MPI_COMM_WORLD);
+  DTCMP_Sort(
+    inbuf, outbuf, 10, MPI_INT, keysat,
+    DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_COMM_WORLD
+  );
 
   MPI_Type_free(&keysat);
 
@@ -98,14 +100,16 @@ Each process creates a datatype to describe the key with its satellite,
 which is the keysat type that consists of 2 consecutive integers.  Then
 each process calls DTCMP_Sort and provides a pointer to its input items
 (inbuf), a buffer to hold the output items (outbuf), the number of
-items (10) in the input buffer, the datatype of the key (MPI_INT),
+items in the input buffer (10), the datatype of the key (MPI_INT),
 the datatype of the key together with its satellite data (keysat),
 the comparison operation (DTCMP_OP_INT_ASCEND -- a pre-defined op to
-sort integer keys in increasing order), and the communicator on which
-to execute the sort (MPI_COMM_WORLD).  The DTCMP_Sort routine is
+sort integer keys in increasing order), an optional set of bit flags
+(DTCMP_FLAG_NONE -- in this case, nothing), and the communicator on
+which to execute the sort (MPI_COMM_WORLD).  The DTCMP_Sort routine is
 collective over the processes in the communicator.  Upon return from
-this routine, outbuf on rank 0 will contain the first 10 items, rank 1
-will contain the next 10 items, rank 2 the next 10, and so on.
+this routine, the items will be globally sorted, meaning the items
+in the output buffer on each process will be in order and if i < j,
+every item on rank i will come before every item on rank j.
 
 The DTCMP_Sort routine assumes that each process provides the same
 number of items for input.  If the number of input items varies across

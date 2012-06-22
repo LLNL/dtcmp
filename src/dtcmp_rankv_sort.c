@@ -24,6 +24,7 @@ static int detect_edges(
   int num,
   MPI_Datatype item,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   int first_in_group[],
   int last_in_group[],
   MPI_Comm comm)
@@ -430,6 +431,7 @@ int DTCMP_Rankv_sort(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
   int i, tmp_rc;
@@ -499,7 +501,7 @@ int DTCMP_Rankv_sort(
   /* sort items */
   tmp_rc = DTCMP_Sortv(
     DTCMP_IN_PLACE, sortbuf, count,
-    type_item, type_item, cmp_item, comm
+    type_item, type_item, cmp_item, hints, comm
   );
   if (tmp_rc != DTCMP_SUCCESS) {
     rc = tmp_rc;
@@ -508,7 +510,7 @@ int DTCMP_Rankv_sort(
   /* detect edges across sorted itemsi, note we pass in the full items,
    * which includes (key,rank,index) but we just use the key cmp operation */
   tmp_rc = detect_edges(
-    sortbuf, count, type_item, cmp,
+    sortbuf, count, type_item, cmp, hints,
     first_in_group, last_in_group, comm
   );
   if (tmp_rc != DTCMP_SUCCESS) {
@@ -560,7 +562,7 @@ int DTCMP_Rankv_sort(
   /* sort back to sender */
   tmp_rc = DTCMP_Sortv(
     DTCMP_IN_PLACE, returnbuf, count,
-    type_2int, type_5int, cmp_2int, comm
+    type_2int, type_5int, cmp_2int, hints, comm
   );
   if (tmp_rc != DTCMP_SUCCESS) {
     rc = tmp_rc;
@@ -601,6 +603,7 @@ int DTCMP_Rankv_strings_sort(
   int  group_id[],
   int  group_ranks[],
   int  group_rank[],
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
   int i;
@@ -641,7 +644,7 @@ int DTCMP_Rankv_strings_sort(
   int rc = DTCMP_Rankv_sort(
     count, buf,
     groups, group_id, group_ranks, group_rank,
-    type_string, type_string, cmp_string, comm
+    type_string, type_string, cmp_string, hints, comm
   );
 
   /* free our string types */

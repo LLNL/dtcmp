@@ -20,15 +20,20 @@
  * Internal types
  * --------------------------------------- */
 
-/* we allocate one of these structs and return a pointer to it as the value for
- * our DTCMP_Op operation handle */
+/* we allocate one of these structs and return a pointer to it as the
+ * value for our DTCMP_Op operation handle */
 typedef struct {
-  uint32_t magic;   /* special integer value which we can use to verify that handle appears valid */
+  uint32_t magic;   /* special integer value which we can use to verify
+                     * that handle appears valid */
   uint32_t type;    /* type of DTCMP handle */
   MPI_Datatype key; /* datatype of items being compared */
   DTCMP_Op_fn fn;   /* comparison function pointer */
-  MPI_Aint disp;    /* byte displacement from current pointer to start of next type */
-  DTCMP_Op series;  /* second comparison handle to be applied if first evaluates to equal */
+  MPI_Aint cmpdisp; /* byte displacement from current pointer to first
+                     * byte to be passed to comparison op */
+  MPI_Aint disp;    /* byte displacement from current pointer to start
+                     * of next type */
+  DTCMP_Op series;  /* second comparison handle to be applied if first
+                     * evaluates to equal */
 } dtcmp_op_handle_t;
 
 /* ---------------------------------------
@@ -38,7 +43,8 @@ typedef struct {
 /* dup of MPI_COMM_SELF that we need for DTCMP_Memcpy */
 extern MPI_Comm dtcmp_comm_self;
 
-/* we create a type of 3 consecutive uint64_t for computing min/max/sum reduction */
+/* we create a type of 3 consecutive uint64_t for computing min/max/sum
+ * reduction */
 extern MPI_Datatype dtcmp_type_3uint64t;
 
 /* op for computing min/max/sum reduction */
@@ -56,15 +62,17 @@ void* dtcmp_malloc(size_t size, size_t alignment, const char* file, int line);
 
 void dtcmp_free(void*);
 
-/* function pointer to a DTCMP_Free implementation that takes a pointer to a handle */
+/* function pointer to a DTCMP_Free implementation that takes a pointer
+ * to a handle */
 typedef int(*dtcmp_handle_free_fn)(DTCMP_Handle*);
 
 /* allocate a handle object of specified size and set it up to be freed
- * with dtcmp_handle_free_single, return pointer to start of buffer and set
- * handle value */
+ * with dtcmp_handle_free_single, return pointer to start of buffer and
+ * set handle value */
 int dtcmp_handle_alloc_single(size_t size, void** buf, DTCMP_Handle* handle);
 
-/* assumes that handle just points to one big block of memory that must be freed */
+/* assumes that handle just points to one big block of memory that must
+ * be freed */
 int dtcmp_handle_free_single(DTCMP_Handle* handle);
 
 /* user-defined reduction operation to compute min/max/sum */
@@ -92,8 +100,8 @@ int dtcmp_type_concat2(MPI_Datatype type1, MPI_Datatype type2, MPI_Datatype* new
  * passed to DTCMP_Handle_free to free the buffer and newly created
  * types. */
 int dtcmp_uniqify(
-  const void* buf, int count, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op cmp,
-  void** outbuf, MPI_Datatype* outkey, MPI_Datatype* outkeysat, DTCMP_Op* outcmp,
+  const void* buf, int count, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op cmp, DTCMP_Flags hints,
+  void** outbuf, MPI_Datatype* outkey, MPI_Datatype* outkeysat, DTCMP_Op* outcmp, DTCMP_Flags* outhints,
   MPI_Comm comm, DTCMP_Handle* uniqhandle
 );
 
@@ -137,6 +145,7 @@ int DTCMP_Search_low_local_binary(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   int* flag,
   int* index
 );
@@ -149,6 +158,7 @@ int DTCMP_Search_high_local_binary(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   int* flag,
   int* index
 );
@@ -162,6 +172,7 @@ int DTCMP_Search_low_list_local_binary(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   int flags[],
   int indicies[]
 );
@@ -176,7 +187,8 @@ int dtcmp_partition_local_memcpy(
   int pivot,
   int num,
   size_t size,
-  DTCMP_Op cmp
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
 );
 
 int DTCMP_Partition_local_dtcpy(
@@ -186,7 +198,8 @@ int DTCMP_Partition_local_dtcpy(
   int* outpivot,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
 );
 
 /* ---------------------------------------
@@ -199,7 +212,8 @@ int dtcmp_merge_local_2way_memcpy(
   int counts[],
   void* outbuf,
   size_t size,
-  DTCMP_Op cmp
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
 );
 
 int DTCMP_Merge_local_2way(
@@ -209,7 +223,8 @@ int DTCMP_Merge_local_2way(
   void* outbuf,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
 );
 
 int DTCMP_Merge_local_kway_heap(
@@ -219,8 +234,13 @@ int DTCMP_Merge_local_kway_heap(
   void* outbuf,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
 );
+
+/* ---------------------------------------
+ * Local select implementations
+ * --------------------------------------- */
 
 int dtcmp_select_local_ends(
   void* buf,
@@ -229,12 +249,9 @@ int dtcmp_select_local_ends(
   void* item,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
 );
-
-/* ---------------------------------------
- * Local select implementations
- * --------------------------------------- */
 
 int DTCMP_Select_local_ends(
   const void* buf,
@@ -243,7 +260,8 @@ int DTCMP_Select_local_ends(
   void* item,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
 );
 
 int DTCMP_Select_local_randpartition(
@@ -253,7 +271,8 @@ int DTCMP_Select_local_randpartition(
   void* item,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
 );
 
 /* ---------------------------------------
@@ -266,7 +285,8 @@ int DTCMP_Sort_local_insertionsort(
   int count,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
 );
 
 int DTCMP_Sort_local_randquicksort(
@@ -275,7 +295,8 @@ int DTCMP_Sort_local_randquicksort(
   int count,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
 );
 
 int DTCMP_Sort_local_mergesort(
@@ -284,7 +305,8 @@ int DTCMP_Sort_local_mergesort(
   int count,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
 );
 
 int DTCMP_Sort_local_qsort(
@@ -293,7 +315,8 @@ int DTCMP_Sort_local_qsort(
   int count,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
 );
 
 /* ---------------------------------------
@@ -307,6 +330,7 @@ int DTCMP_Sort_allgather(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm
 );
 
@@ -317,6 +341,7 @@ int DTCMP_Sort_bitonic(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm
 );
 
@@ -331,6 +356,7 @@ int DTCMP_Sortv_allgather(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm
 );
 
@@ -341,6 +367,7 @@ int DTCMP_Sortv_sortgather_scatter(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm
 );
 
@@ -351,6 +378,7 @@ int DTCMP_Sortv_cheng(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm
 );
 
@@ -361,6 +389,7 @@ int DTCMP_Sortv_ranklist_cheng(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   int group_rank,
   int group_ranks,
   const int comm_ranklist[],
@@ -379,6 +408,7 @@ int DTCMP_Sortz_samplesort(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm,
   DTCMP_Handle* handle
 );
@@ -397,6 +427,7 @@ int DTCMP_Rankv_sort(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm
 );
 
@@ -407,6 +438,7 @@ int DTCMP_Rankv_strings_sort(
   int  group_id[],
   int  group_ranks[],
   int  group_rank[],
+  DTCMP_Flags hints,
   MPI_Comm comm
 );
 

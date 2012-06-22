@@ -21,7 +21,8 @@ int DTCMP_Select_local_ends(
   void* item,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   int rc = DTCMP_SUCCESS;
 

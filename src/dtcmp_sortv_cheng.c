@@ -18,6 +18,7 @@ int DTCMP_Sortv_cheng(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
   /* get our rank and the number of ranks in this comm */
@@ -36,7 +37,7 @@ int DTCMP_Sortv_cheng(
 
   /* call ranklist_cheng sort */
   DTCMP_Sortv_ranklist_cheng(
-    inbuf, outbuf, count, key, keysat, cmp,
+    inbuf, outbuf, count, key, keysat, cmp, hints,
     rank, ranks, ranklist, comm
   );
 

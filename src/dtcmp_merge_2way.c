@@ -16,7 +16,8 @@ int dtcmp_merge_local_2way_memcpy(
   int counts[],
   void* outbuf,
   size_t size,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   /* setup a pointer to march through elements in output buffer */
   char* out = (char*)outbuf;
@@ -61,7 +62,8 @@ int DTCMP_Merge_local_2way(
   void* outbuf,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   /* setup a pointer to march through elements in output buffer */
   char* out = (char*)outbuf;

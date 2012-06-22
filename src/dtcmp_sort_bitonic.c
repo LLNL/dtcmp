@@ -121,6 +121,7 @@ static int DTCMP_Sort_bitonic_merge_multiple(
   MPI_Datatype keysat,
   MPI_Aint extent,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   int rank,
   int start,
   int num,
@@ -157,7 +158,7 @@ static int DTCMP_Sort_bitonic_merge_multiple(
         bufs[1] = recv;
         counts[0] = count;
         counts[1] = count;
-        DTCMP_Merge_local(2, bufs, counts, merge, key, keysat, cmp);
+        DTCMP_Merge_local(2, bufs, counts, merge, key, keysat, cmp, hints);
         if (direction) {
           /* if we're in the lower half of the procs and direction is increasing, take the lower half of the values */
           DTCMP_Memcpy(value, count, keysat, merge, count, keysat);
@@ -169,7 +170,7 @@ static int DTCMP_Sort_bitonic_merge_multiple(
       }
 
       /* recursively merge our half */
-      DTCMP_Sort_bitonic_merge_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, start, dist, direction, comm);
+      DTCMP_Sort_bitonic_merge_multiple(value, recv, merge, count, key, keysat, extent, cmp, hints, rank, start, dist, direction, comm);
     } else {
       int dst_rank = rank - dist;
       if (dst_rank >= start) {
@@ -186,7 +187,7 @@ static int DTCMP_Sort_bitonic_merge_multiple(
         bufs[1] = value;
         counts[0] = count;
         counts[1] = count;
-        DTCMP_Merge_local(2, bufs, counts, merge, key, keysat, cmp);
+        DTCMP_Merge_local(2, bufs, counts, merge, key, keysat, cmp, hints);
         if (direction) {
           /* if we're in the upper half of the procs and direction is increasing, take the upper half of the values */
           char* target = (char*)merge + count * extent;
@@ -199,7 +200,7 @@ static int DTCMP_Sort_bitonic_merge_multiple(
       /* recursively merge our half */
       int new_start = start + dist;
       int new_num   = num - dist;
-      DTCMP_Sort_bitonic_merge_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, new_start, new_num, direction, comm);
+      DTCMP_Sort_bitonic_merge_multiple(value, recv, merge, count, key, keysat, extent, cmp, hints, rank, new_start, new_num, direction, comm);
     }
   }
 
@@ -216,6 +217,7 @@ static int DTCMP_Sort_bitonic_sort_multiple(
   MPI_Datatype keysat,
   MPI_Aint extent,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   int rank,
   int start,
   int num,
@@ -226,15 +228,15 @@ static int DTCMP_Sort_bitonic_sort_multiple(
     /* recursively divide and sort each half */
     int mid = num / 2;
     if (rank < start + mid) {
-      DTCMP_Sort_bitonic_sort_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, start, mid, !direction, comm);
+      DTCMP_Sort_bitonic_sort_multiple(value, recv, merge, count, key, keysat, extent, cmp, hints, rank, start, mid, !direction, comm);
     } else {
       int new_start = start + mid;
       int new_num   = num - mid;
-      DTCMP_Sort_bitonic_sort_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, new_start, new_num, direction, comm);
+      DTCMP_Sort_bitonic_sort_multiple(value, recv, merge, count, key, keysat, extent, cmp, hints, rank, new_start, new_num, direction, comm);
     }
 
     /* merge the two sorted halves */
-    DTCMP_Sort_bitonic_merge_multiple(value, recv, merge, count, key, keysat, extent, cmp, rank, start, num, direction, comm);
+    DTCMP_Sort_bitonic_merge_multiple(value, recv, merge, count, key, keysat, extent, cmp, hints, rank, start, num, direction, comm);
   }
 
   return 0;
@@ -247,6 +249,7 @@ int DTCMP_Sort_bitonic(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
   int rc = DTCMP_SUCCESS;
@@ -281,11 +284,11 @@ int DTCMP_Sort_bitonic(
       DTCMP_Sort_bitonic_sort_single(value, extra, keysat, cmp, rank, 0, ranks, 1, comm);
     } else {
       /* sort local elements first */
-      DTCMP_Sort_local(DTCMP_IN_PLACE, value, count, key, keysat, cmp);
+      DTCMP_Sort_local(DTCMP_IN_PLACE, value, count, key, keysat, cmp, hints);
 
       /* now sort across processes */
       DTCMP_Sort_bitonic_sort_multiple(
-        value, extra, merge, count, key, keysat, true_extent, cmp,
+        value, extra, merge, count, key, keysat, true_extent, cmp, hints,
         rank, 0, ranks, 1, comm
       );
     }

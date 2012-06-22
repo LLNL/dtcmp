@@ -92,14 +92,17 @@ int dtcmp_handle_free_uniqify(DTCMP_Handle* handle)
  * new comparison operation.  When done, the associated handle must be
  * passed to DTCMP_Handle_free to clean up. */
 int dtcmp_uniqify(
-  const void* inbuf, int count, MPI_Datatype inkey, MPI_Datatype inkeysat, DTCMP_Op incmp,
-  void** outbuf, MPI_Datatype* outkey, MPI_Datatype* outkeysat, DTCMP_Op* outcmp,
+  const void* inbuf, int count, MPI_Datatype inkey, MPI_Datatype inkeysat, DTCMP_Op incmp, DTCMP_Flags inhints,
+  void** outbuf, MPI_Datatype* outkey, MPI_Datatype* outkeysat, DTCMP_Op* outcmp, DTCMP_Flags* outhints,
   MPI_Comm comm, DTCMP_Handle* handle)
 {
   /* TODO: with an allreduce and scan, we get total number of items,
    * and the offset of each of ours, then use this info to use one
    * original index tag globally across procs and select the smallest
    * datatype to use as this tag */
+
+  /* TODO: just copy input params to output and return if inhints have unique bit set */
+  *outhints = inhints | DTCMP_FLAG_UNIQUE;
 
   /* DTCMP_OP_create_hseries(first, cmp_offset, series_offset, second, cmp) 
    * or provide all functions with separate key and sat types so we can pull them apart */

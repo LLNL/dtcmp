@@ -19,6 +19,7 @@ OBJS= \
   dtcmp_merge_kway_heap.o \
   dtcmp_select_local_ends.o \
   dtcmp_select_local_randpartition.o \
+  dtcmp_selectv_medianofmedians.o \
   dtcmp_is_sorted.o \
   dtcmp_sort_local_insertionsort.o \
   dtcmp_sort_local_randquicksort.o \

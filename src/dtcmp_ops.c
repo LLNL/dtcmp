@@ -17,18 +17,20 @@ void dtcmp_op_hinit(
   uint32_t type,
   MPI_Datatype key,
   DTCMP_Op_fn fn,
+  MPI_Aint cmpdisp,
   MPI_Aint disp,
   DTCMP_Op series,
   DTCMP_Op* cmp)
 {
   dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) malloc(sizeof(dtcmp_op_handle_t));
   if (c != NULL) {
-    c->magic  = 1;
-    c->type   = type;
+    c->magic   = 1;
+    c->type    = type;
     MPI_Type_dup(key, &(c->key));
-    c->fn     = fn;
-    c->disp   = disp;
-    c->series = series;
+    c->fn      = fn;
+    c->cmpdisp = cmpdisp;
+    c->disp    = disp;
+    c->series  = series;
   }
   *cmp = (DTCMP_Op) c;
 }
@@ -46,7 +48,8 @@ void dtcmp_op_init(
   MPI_Type_get_extent(key, &lb, &extent);
 
   /* use extent of key type as displacement to second item */
-  dtcmp_op_hinit(type, key, fn, extent, series, cmp);
+  MPI_Aint cmpdisp = 0;
+  dtcmp_op_hinit(type, key, fn, cmpdisp, extent, series, cmp);
 }
 
 /* make a copy of src operation and save in dst */
@@ -54,11 +57,11 @@ void dtcmp_op_copy(DTCMP_Op* dst, DTCMP_Op src)
 {
   dtcmp_op_handle_t* s = (dtcmp_op_handle_t*) src;
   if (s->series == DTCMP_OP_NULL) {
-    dtcmp_op_hinit(s->type, s->key, s->fn, s->disp, s->series, dst);
+    dtcmp_op_hinit(s->type, s->key, s->fn, s->cmpdisp, s->disp, s->series, dst);
   } else {
     DTCMP_Op copy;
     dtcmp_op_copy(&copy, s->series);
-    dtcmp_op_hinit(s->type, s->key, s->fn, s->disp, copy, dst);
+    dtcmp_op_hinit(s->type, s->key, s->fn, s->cmpdisp, s->disp, copy, dst);
   }
 }
 
@@ -69,7 +72,9 @@ int dtcmp_op_eval(const void* a, const void* b, DTCMP_Op cmp)
   DTCMP_Op_fn compare = c->fn;
 
   /* invoke comparison function to compare a and b */
-  int rc = (*compare)(a, b);
+  const void* a_cur = (const char*)a + c->cmpdisp;
+  const void* b_cur = (const char*)b + c->cmpdisp;
+  int rc = (*compare)(a_cur, b_cur);
   if (rc != 0) {
     /* comparison found the two are not equal, just return our result */
     return rc;
@@ -77,13 +82,14 @@ int dtcmp_op_eval(const void* a, const void* b, DTCMP_Op cmp)
     /* a and b are equal, see if there is a series comparison */
     if (c->series != DTCMP_OP_NULL) {
       /* advance pointers to point past end of exurrent key */
-      const void* a_new = (char*)a + c->disp;
-      const void* b_new = (char*)b + c->disp;
+      const void* a_new = (const char*)a + c->disp;
+      const void* b_new = (const char*)b + c->disp;
 
       /* invoke series comparison function */
       return dtcmp_op_eval(a_new, b_new, c->series);
     } else {
-      /* a and b are equal and there is no series comparison, just return our result (equal) */
+      /* a and b are equal and there is no series comparison,
+       * just return our result (equal) */
       return rc;
     }
   }

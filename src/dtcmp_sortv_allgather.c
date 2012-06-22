@@ -18,6 +18,7 @@ int DTCMP_Sortv_allgather(
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
   /* get our rank and the number of ranks in this comm */
@@ -64,7 +65,7 @@ int DTCMP_Sortv_allgather(
       MPI_Allgatherv(sendbuf, count, keysat, (void*)recvbuf, counts, displs, keysat, comm);
 
       /* sort items with local sort */
-      DTCMP_Sort_local(DTCMP_IN_PLACE, recvbuf, total_count, key, keysat, cmp);
+      DTCMP_Sort_local(DTCMP_IN_PLACE, recvbuf, total_count, key, keysat, cmp, hints);
 
       /* copy our items into outbuf */
       char* mybuf = recvbuf + myoffset * true_extent;

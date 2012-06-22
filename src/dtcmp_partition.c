@@ -44,7 +44,8 @@ int dtcmp_partition_local_memcpy(
   int pivot,
   int num,
   size_t size,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   /* swap pivot element with last element */
   char* pivotbuf = (char*)buf + pivot   * size;
@@ -96,7 +97,8 @@ int DTCMP_Partition_local_dtcpy(
   int* outpivot,
   MPI_Datatype key,
   MPI_Datatype keysat,
-  DTCMP_Op cmp)
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
 {
   /* get extent of keysat datatype */
   MPI_Aint lb, extent;
