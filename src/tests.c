@@ -238,6 +238,33 @@ int test_variable_sorts(
   return 0;
 }
 
+int is_kth(
+  const char* test,
+  int k,
+  const void* item,
+  const void* buf,
+  int size,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Comm comm)
+{
+  uint64_t lt, eq, gt;
+  dtcmp_get_lt_eq_gt(item, buf, size, key, keysat, cmp, hints, &lt, &eq, &gt, comm);
+
+  if (k <= lt || k > (lt + eq)) {
+    int rank;
+    MPI_Comm_rank(comm, &rank);
+    if (rank == 0) {
+      //printf("ERROR DETECTED rank=%d test=%s routine=%s\n", rank, test, name);
+      printf("ERROR DETECTED is_kth\n");
+    }
+  }
+
+  return 0;
+}
+
 int main(int argc, char* argv[])
 {
   int i;
@@ -275,11 +302,20 @@ int main(int argc, char* argv[])
   DTCMP_Op op;
   DTCMP_Flags hints = DTCMP_FLAG_NONE;
   MPI_Comm comm;
+  int kth;
 
-DTCMP_Op series1, series2, series;
-DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_LONG_ASCEND, &series1);
-DTCMP_Op_create_series(DTCMP_OP_FLOAT_ASCEND, DTCMP_OP_DOUBLE_ASCEND, &series2);
-DTCMP_Op_create_series(series1, series2, &series);
+DTCMP_Op series1, series2, series3;
+DTCMP_Op_create_series2(DTCMP_OP_INT_ASCEND, DTCMP_OP_LONG_ASCEND, &series1);
+DTCMP_Op_create_series2(DTCMP_OP_FLOAT_ASCEND, DTCMP_OP_DOUBLE_ASCEND, &series2);
+DTCMP_Op_create_series2(series1, series2, &series3);
+
+DTCMP_Op series4;
+DTCMP_Op series[4];
+series[0] = DTCMP_OP_INT_ASCEND;
+series[1] = DTCMP_OP_LONG_ASCEND;
+series[2] = DTCMP_OP_FLOAT_ASCEND;
+series[3] = DTCMP_OP_DOUBLE_ASCEND;
+DTCMP_Op_create_series(4, series, &series4);
 
   int in_1int[SIZE], out_1int[SIZE];
   inbuf  = (void*) in_1int;
@@ -309,9 +345,15 @@ DTCMP_Op_create_series(series1, series2, &series);
   op = DTCMP_OP_INT_DESCEND;
   test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, hints, comm);
 
-DTCMP_Selectv(inbuf, size,                1, outbuf, key, keysat, op, hints, comm);
-DTCMP_Selectv(inbuf, size, (ranks*size/2)+1, outbuf, key, keysat, op, hints, comm);
-DTCMP_Selectv(inbuf, size,       ranks*size, outbuf, key, keysat, op, hints, comm);
+kth = 1;
+DTCMP_Selectv(inbuf, size, kth, outbuf, key, keysat, op, hints, comm);
+is_kth(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
+kth = (ranks*size/2)+1;
+DTCMP_Selectv(inbuf, size, kth, outbuf, key, keysat, op, hints, comm);
+is_kth(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
+kth = ranks*size;
+DTCMP_Selectv(inbuf, size, kth, outbuf, key, keysat, op, hints, comm);
+is_kth(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
 
   /* test that all sorts work with count>1 on all procs */
   size = SIZE;
@@ -322,9 +364,15 @@ DTCMP_Selectv(inbuf, size,       ranks*size, outbuf, key, keysat, op, hints, com
   op = DTCMP_OP_INT_DESCEND;
   test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, hints, comm);
 
-DTCMP_Selectv(inbuf, size,                1, outbuf, key, keysat, op, hints, comm);
-DTCMP_Selectv(inbuf, size, (ranks*size/2)+1, outbuf, key, keysat, op, hints, comm);
-DTCMP_Selectv(inbuf, size,       ranks*size, outbuf, key, keysat, op, hints, comm);
+kth = 1;
+DTCMP_Selectv(inbuf, size, kth, outbuf, key, keysat, op, hints, comm);
+is_kth(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
+kth = (ranks*size/2)+1;
+DTCMP_Selectv(inbuf, size, kth, outbuf, key, keysat, op, hints, comm);
+is_kth(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
+kth = ranks*size;
+DTCMP_Selectv(inbuf, size, kth, outbuf, key, keysat, op, hints, comm);
+is_kth(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
 
   for (i = 0; i < SIZE; i++) {
     in_1int[i]  = 1;
@@ -365,8 +413,8 @@ DTCMP_Selectv(inbuf, size, (ranks*size/1), outbuf, key, keysat, op, hints, comm)
   MPI_Type_commit(&type_2int);
 
   DTCMP_Op cmp_updown, cmp_downdown;
-  DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_DESCEND, &cmp_updown);
-  DTCMP_Op_create_series(DTCMP_OP_INT_DESCEND, DTCMP_OP_INT_DESCEND, &cmp_downdown);
+  DTCMP_Op_create_series2(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_DESCEND, &cmp_updown);
+  DTCMP_Op_create_series2(DTCMP_OP_INT_DESCEND, DTCMP_OP_INT_DESCEND, &cmp_downdown);
 
   int in_2int[SIZE*2], out_2int[SIZE*2];
   inbuf  = (void*) in_2int;

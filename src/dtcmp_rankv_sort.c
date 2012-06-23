@@ -470,8 +470,8 @@ int DTCMP_Rankv_sort(
   /* create our comparison operation for sorting:
    * sort by key, then rank, then index */
   DTCMP_Op cmp_2int, cmp_item;
-  DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_ASCEND, &cmp_2int);
-  DTCMP_Op_create_series(cmp, cmp_2int, &cmp_item);
+  DTCMP_Op_create_series2(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_ASCEND, &cmp_2int);
+  DTCMP_Op_create_series2(cmp, cmp_2int, &cmp_item);
 
   /* build items to be sorted with return address */
   size_t sort_size   = key_true_extent + 2 * sizeof(int);

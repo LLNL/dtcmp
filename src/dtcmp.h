@@ -53,10 +53,12 @@ extern const void* DTCMP_IN_PLACE;
  * functions */
 typedef int DTCMP_Flags;
 
-#define DTCMP_FLAG_NONE   (0x0)  /* no hints/assertions provided */
-#define DTCMP_FLAG_UNIQUE_LOCAL (0x1) /* elems known to be locally unique */
-#define DTCMP_FLAG_UNIQUE (0x2)  /* elems known to be globally unique */
-#define DTCMP_FLAG_STABLE (0x10) /* caller requires stable sort */
+#define DTCMP_FLAG_NONE   (0x0) /* no hints/assertions provided */
+#define DTCMP_FLAG_UNIQUE_LOCAL (0x1)  /* elems known to be locally unique */
+#define DTCMP_FLAG_UNIQUE       (0x2)  /* elems known to be globally unique */
+#define DTCMP_FLAG_SORTED_LOCAL (0x10) /* elems known to be ordered locally */
+#define DTCMP_FLAG_SORTED       (0x20) /* elems known to be ordered globally */
+#define DTCMP_FLAG_STABLE (0x100) /* caller requires stable sort */
 
 /* ----------------------------------------------
  * Initialization and Finalization Functions
@@ -146,8 +148,36 @@ int DTCMP_Op_create(
 /* create a series comparison which executes the first comparison
  * operation and then the second if the first evaluates to equal,
  * second key is assumed to be located extent(first) bytes from first */
-int DTCMP_Op_create_series(
+int DTCMP_Op_create_series2(
   DTCMP_Op first,   /* IN  - first cmp operation (handle) */
+  DTCMP_Op second,  /* IN  - second cmp operation if first is
+                     *       equal (handle) */
+  DTCMP_Op* cmp     /* OUT - comparison operation (handle) */
+);
+
+/* create a series comparison which executes the first comparison
+ * operation and then the second if the first evaluates to equal,
+ * and so on down the chain, each key is assumed to be located
+ * immediately following the key before it (uses extent of key
+ * datatype to determine length of each key) */
+int DTCMP_Op_create_series(
+  int num,      /* IN  - number of items in series array
+                 *       (non-negative integer) */
+  const DTCMP_Op series[],
+                /* IN  - comparison operations in series
+                 *       (array of handles of length num) */
+  DTCMP_Op* cmp /* OUT - comparison operation (handle) */
+);
+
+/* create a series comparison which executes the first comparison
+ * operation and then the second if the first evaluates to equal,
+ * explicit byte displacement is given to go from first to second key */
+int DTCMP_Op_create_hseries2(
+  DTCMP_Op first,   /* IN  - first cmp operation (handle) */
+  MPI_Aint cmpdisp, /* IN  - byte displacement to advance pointer to
+                     *       start of first item (integer) */
+  MPI_Aint disp,    /* IN  - byte displacement to advance pointer to
+                     *       start of second item (integer) */
   DTCMP_Op second,  /* IN  - second cmp operation if first is
                      *       equal (handle) */
   DTCMP_Op* cmp     /* OUT - comparison operation (handle) */
@@ -157,14 +187,20 @@ int DTCMP_Op_create_series(
  * operation and then the second if the first evaluates to equal,
  * explicit byte displacement is given to go from first to second key */
 int DTCMP_Op_create_hseries(
-  DTCMP_Op first,   /* IN  - first cmp operation (handle) */
-  MPI_Aint cmpdisp, /* IN  - byte displacement to advance pointer to
-                     *       start of first item (integer) */
-  MPI_Aint disp,    /* IN  - byte displacement to advance pointer to
-                     *       start of second item (integer) */
-  DTCMP_Op second,  /* IN  - second cmp operation if first is
-                     *       equal (handle) */
-  DTCMP_Op* cmp     /* OUT - comparison operation (handle) */
+  int num,      /* IN  - number of items in series array
+                 *       (non-negative integer) */
+  const DTCMP_Op series[],
+                /* IN  - comparison operations in series
+                 *       (array of handles of length num) */
+  const MPI_Aint cmpdisp[],
+                /* IN  - byte displacement to advance pointer to
+                 *       start of first item (array of integer of
+                 *       length num) */
+  const MPI_Aint disp[],
+                /* IN  - byte displacement to advance pointer to
+                 *       start of second item (array of integer of
+                 *       length num) */
+  DTCMP_Op* cmp /* OUT - comparison operation (handle) */
 );
 
 /* free object referenced by comparison operation handle,

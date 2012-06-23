@@ -336,66 +336,133 @@ int DTCMP_Op_create(MPI_Datatype key, DTCMP_Op_fn fn, DTCMP_Op* cmp)
 
 /* create a series comparison which executes the first comparison operation
  * and then the second if the first evaluates to equal */
-int DTCMP_Op_create_series(DTCMP_Op first, DTCMP_Op second, DTCMP_Op* cmp)
+int DTCMP_Op_create_series(int num, const DTCMP_Op series[], DTCMP_Op* cmp)
 {
   /* check parameters */
+  if (num < 0) {
+    return DTCMP_FAILURE;
+  }
   if (cmp == NULL) {
     return DTCMP_FAILURE;
   }
 
-  /* copy the first into cmp */
-  dtcmp_op_copy(cmp, first);
-
-  /* traverse to last in series of first */
-  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*)(*cmp);
-  while (c->series != DTCMP_OP_NULL) {
-    c = (dtcmp_op_handle_t*)(c->series);
+  /* bail out if num is 0 */
+  if (num == 0) {
+    *cmp = DTCMP_OP_NULL;
+    return DTCMP_SUCCESS;
   }
 
-  /* set this item to OP_SERIES */
-  c->type = DTCMP_OP_TYPE_SERIES;
+  /* copy the first into cmp */
+  dtcmp_op_copy(cmp, series[0]);
+  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*)(*cmp);
 
-  /* make a full copy of the second op and attach it */
-  DTCMP_Op copy;
-  dtcmp_op_copy(&copy, second);
-  c->series = copy;
+  /* copy and attach all other ops to this one */
+  int i;
+  for (i = 1; i < num; i++) {
+    /* traverse to last in series of current item */
+    while (c->series != DTCMP_OP_NULL) {
+      c = (dtcmp_op_handle_t*)(c->series);
+    }
+
+    /* set this last item to OP_SERIES */
+    c->type = DTCMP_OP_TYPE_SERIES;
+
+    /* make a full copy of the next item in series and attach it */
+    DTCMP_Op copy;
+    dtcmp_op_copy(&copy, series[i]);
+    c->series = copy;
+  }
 
   return DTCMP_SUCCESS;
 }
 
 /* create a series comparison which executes the first comparison operation
  * and then the second if the first evaluates to equal */
-int DTCMP_Op_create_hseries(DTCMP_Op first, MPI_Aint cmpdisp, MPI_Aint disp, DTCMP_Op second, DTCMP_Op* cmp)
+int DTCMP_Op_create_series2(DTCMP_Op first, DTCMP_Op second, DTCMP_Op* cmp)
+{
+  DTCMP_Op series[2];
+  series[0] = first;
+  series[1] = second;
+  return DTCMP_Op_create_series(2, series, cmp);
+}
+
+/* create a series comparison which executes the first comparison operation
+ * and then the second if the first evaluates to equal */
+int DTCMP_Op_create_hseries(
+  int num,
+  const DTCMP_Op series[],
+  const MPI_Aint cmpdisp[],
+  const MPI_Aint disp[],
+  DTCMP_Op* cmp)
 {
   /* check parameters */
+  if (num < 0) {
+    return DTCMP_FAILURE;
+  }
   if (cmp == NULL) {
     return DTCMP_FAILURE;
   }
 
-  /* copy the first into cmp */
-  dtcmp_op_copy(cmp, first);
-
-  /* set the cmpdisp value */
-  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*)(*cmp);
-  c->cmpdisp = cmpdisp;
-
-  /* traverse to last in series of first, and count off our
-   * displacement as we go */
-  while (c->series != DTCMP_OP_NULL) {
-    disp -= c->disp;
-    c = (dtcmp_op_handle_t*)(c->series);
+  /* bail out if num is 0 */
+  if (num == 0) {
+    *cmp = DTCMP_OP_NULL;
+    return DTCMP_SUCCESS;
   }
 
-  /* set this item to OP_SERIES and adjust the displacement */
-  c->type = DTCMP_OP_TYPE_SERIES;
-  c->disp = disp;
+  /* copy the first into cmp */
+  dtcmp_op_copy(cmp, series[0]);
 
-  /* make a full copy of the second op and attach it */
-  DTCMP_Op copy;
-  dtcmp_op_copy(&copy, second);
-  c->series = copy;
+  /* set the cmpdisp value and set our displacement value */
+  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*)(*cmp);
+  c->cmpdisp = cmpdisp[0];
+  MPI_Aint newdisp = disp[0];
+
+  /* copy and attach all other ops to this one */
+  int i;
+  for (i = 1; i < num; i++) {
+    /* traverse to last in series of first, and count off our
+     * displacement as we go */
+    while (c->series != DTCMP_OP_NULL) {
+      newdisp -= c->disp;
+      c = (dtcmp_op_handle_t*)(c->series);
+    }
+
+    /* set this item to OP_SERIES and adjust the displacement */
+    c->type = DTCMP_OP_TYPE_SERIES;
+    c->disp = newdisp;
+
+    /* make a full copy of the second op and attach it */
+    DTCMP_Op copy;
+    dtcmp_op_copy(&copy, series[i]);
+    c->series = copy;
+
+    /* advance to the next item in the chain, set the cmpdisp value,
+     * and reset our displacement value */
+    c = (dtcmp_op_handle_t*)(c->series);
+    c->cmpdisp = cmpdisp[i];
+    newdisp = disp[i];
+  }
 
   return DTCMP_SUCCESS;
+}
+
+/* create a series comparison which executes the first comparison operation
+ * and then the second if the first evaluates to equal */
+int DTCMP_Op_create_hseries2(DTCMP_Op first, MPI_Aint cmpdisp, MPI_Aint disp, DTCMP_Op second, DTCMP_Op* cmp)
+{
+  DTCMP_Op series[2];
+  series[0]   = first;
+  series[1]   = second;
+
+  MPI_Aint cmpdisps[2];
+  cmpdisps[0] = cmpdisp;
+  cmpdisps[1] = 0;
+
+  MPI_Aint disps[2];
+  disps[0]    = disp;
+  disps[1]    = 0; /* this value ignored */
+
+  return DTCMP_Op_create_hseries(2, series, cmpdisps, disps, cmp);
 }
 
 /* free object referenced by comparison operation handle */

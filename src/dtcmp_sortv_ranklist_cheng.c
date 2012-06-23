@@ -273,7 +273,7 @@ static int find_exact_splitters(
    * don't compare key if either count is zero, since key may be garbage */
   DTCMP_Op cmp_count_nonzero, cmp_int_with_key;
   DTCMP_Op_create(MPI_INT, int_with_key_cmp_fn, &cmp_count_nonzero);
-  DTCMP_Op_create_series(cmp_count_nonzero, cmp, &cmp_int_with_key);
+  DTCMP_Op_create_series2(cmp_count_nonzero, cmp, &cmp_int_with_key);
 
   /* create and commit datatype to represent concatenation of int with key */
   MPI_Datatype type_int_with_key;

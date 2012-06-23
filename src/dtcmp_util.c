@@ -121,6 +121,70 @@ int dtcmp_get_uint64t_min_max_sum(int count, uint64_t* min, uint64_t* max, uint6
   return DTCMP_SUCCESS;
 }
 
+int dtcmp_get_lt_eq_gt(
+  const void* target,
+  const void* buf,
+  int count,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  uint64_t* lt,
+  uint64_t* eq,
+  uint64_t* gt,
+  MPI_Comm comm)
+{
+  /* get extent of keysat type */
+  MPI_Aint keysat_lb, keysat_extent;
+  MPI_Type_get_extent(keysat, &keysat_lb, &keysat_extent);
+
+  /* get comparison operation */
+  dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) cmp;
+  DTCMP_Op_fn compare = c->fn;
+  
+  /* get local count of less than / equal / greater than */
+  uint64_t counts[3] = {0,0,0};
+  if (hints & (DTCMP_FLAG_SORTED_LOCAL | DTCMP_FLAG_SORTED)) {
+    /* if hint shows that local data is sorted, use binary search */
+    if (count > 0) {
+      int start_index = 0;
+      int end_index   = count - 1;
+      int flag, lowest, highest;
+      DTCMP_Search_low_local(target,  buf, start_index, end_index, key, keysat, cmp, hints, &flag, &lowest);
+      DTCMP_Search_high_local(target, buf, lowest,      end_index, key, keysat, cmp, hints, &flag, &highest);
+      counts[0] = (uint64_t)(lowest - start_index);
+      counts[1] = (uint64_t)((highest + 1) - lowest);
+      counts[2] = (uint64_t)count - counts[0] - counts[1];
+    }
+  } else {
+    /* otherwise, just march through the whole list and count */
+    int i;
+    const char* ptr = (const char*) buf;
+    for (i = 0; i < count; i++) {
+      int result = (*compare)(ptr, target);
+      if (result < 0) {
+        counts[0]++;
+      } else if (result == 0) {
+        counts[1]++;
+      } else {
+        counts[2]++;
+      }
+      ptr += keysat_extent;
+    }
+  }
+
+  /* get global sum of less than / equal / greater than */
+  uint64_t all_counts[3];
+  MPI_Allreduce(counts, all_counts, 3, MPI_UINT64_T, MPI_SUM, comm);
+  
+  /* set output parameters */
+  *lt = all_counts[0];
+  *eq = all_counts[1];
+  *gt = all_counts[2];
+
+  return DTCMP_SUCCESS;
+}
+
 /* builds and commits a new datatype that is the concatenation of the
  * list of old types, each oldtype should have no holes */
 int dtcmp_type_concat(int num, const MPI_Datatype oldtypes[], MPI_Datatype* newtype)

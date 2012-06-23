@@ -188,7 +188,7 @@ int dtcmp_uniqify(
     dtcmp_type_concat(3, types, &values->keysat);
 
     /* build new comparison op, key then rank */
-    DTCMP_Op_create_series(incmp, DTCMP_OP_INT_ASCEND, &values->cmp);
+    DTCMP_Op_create_series2(incmp, DTCMP_OP_INT_ASCEND, &values->cmp);
   } else {
     /* build new key type (key, rank, index) */
     types[0] = inkey;
@@ -204,10 +204,11 @@ int dtcmp_uniqify(
     dtcmp_type_concat(4, types, &values->keysat);
 
     /* build new comparison op, key then rank then index */
-    DTCMP_Op cmp_2int;
-    DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_ASCEND, &cmp_2int);
-    DTCMP_Op_create_series(incmp, cmp_2int, &values->cmp);
-    DTCMP_Op_free(&cmp_2int);
+    DTCMP_Op series[3];
+    series[0] = incmp;
+    series[1] = DTCMP_OP_INT_ASCEND;
+    series[2] = DTCMP_OP_INT_ASCEND;
+    DTCMP_Op_create_series(3, series, &values->cmp);
   }
 
   /* set output parameters */

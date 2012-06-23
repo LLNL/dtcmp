@@ -82,6 +82,20 @@ int dtcmp_handle_free_single(DTCMP_Handle* handle);
 #define MMS_SUM (2)
 int dtcmp_get_uint64t_min_max_sum(int count, uint64_t* min, uint64_t* max, uint64_t* sum, MPI_Comm comm);
 
+int dtcmp_get_lt_eq_gt(
+  const void* target,
+  const void* buf,
+  int count,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  uint64_t* lt,
+  uint64_t* eq,
+  uint64_t* gt,
+  MPI_Comm comm
+);
+
 /* builds and commits a new datatype that is the concatenation of the
  * list of old types, each oldtype should have no holes */
 int dtcmp_type_concat(int num, const MPI_Datatype oldtypes[], MPI_Datatype* newtype);

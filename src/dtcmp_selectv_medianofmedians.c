@@ -13,6 +13,15 @@
 #include "mpi.h"
 #include "dtcmp_internal.h"
 
+/* rank 0 gathers one median from each process and finds the weighted
+ * median of medians, then an allreduce is issued to count number
+ * of items 1) less than and 2) equal to this value, O(log n)
+ * iterations required to narrow in on specified rank.
+ *
+ * communication: O(p * log n) communication
+ * computation:   O((n/p * log n/p) + (p * log p + log n/p) * log n)
+ * memory:        O(p) */
+
 #define LT (0)
 #define EQ (1)
 
@@ -213,7 +222,7 @@ static int find_kth_item(
    * don't compare key if either count is zero, since key may be garbage */
   DTCMP_Op cmp_count_nonzero, cmp_int_with_key;
   DTCMP_Op_create(MPI_INT, int_with_key_cmp_fn, &cmp_count_nonzero);
-  DTCMP_Op_create_series(cmp_count_nonzero, cmp, &cmp_int_with_key);
+  DTCMP_Op_create_series2(cmp_count_nonzero, cmp, &cmp_int_with_key);
 
   /* create and commit datatype to represent concatenation of int with key */
   MPI_Datatype type_int_with_key;

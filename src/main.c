@@ -89,7 +89,7 @@ int main(int argc, char* argv[])
   }
 
   DTCMP_Op cmp_2int;
-  DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_DESCEND, &cmp_2int);
+  DTCMP_Op_create_series2(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_DESCEND, &cmp_2int);
 
   MPI_Datatype type_2int;
   MPI_Type_contiguous(2, MPI_INT, &type_2int);
