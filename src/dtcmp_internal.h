@@ -51,6 +51,12 @@ extern MPI_Datatype dtcmp_type_3uint64t;
 /* op for computing min/max/sum reduction */
 extern MPI_Op dtcmp_reduceop_mms_3uint64t;
 
+/* we create a type of 3 consecutive int for computing max rand/count/rank reduction */
+extern MPI_Datatype dtcmp_type_3int;
+
+/* op for computing max rand/count/rank reduction */
+extern MPI_Op dtcmp_reduceop_randroot;
+
 /* we call rand_r() to acquire random numbers,
  * and this keeps track of the seed between calls */
 extern unsigned dtcmp_rand_seed;
@@ -81,6 +87,17 @@ int dtcmp_handle_free_single(DTCMP_Handle* handle);
 #define MMS_MAX (1)
 #define MMS_SUM (2)
 int dtcmp_get_uint64t_min_max_sum(int count, uint64_t* min, uint64_t* max, uint64_t* sum, MPI_Comm comm);
+
+/* user-defined reduction to randomly select a root */
+#define RANDROOT_COUNT (0)
+#define RANDROOT_RAND  (1)
+#define RANDROOT_RANK  (2)
+int dtcmp_get_randroot(int count, int* flag, int* root, MPI_Comm comm);
+
+/* randomly choose element from all tasks as bcast element,
+ * a weight of 0 disqualifies a process from contributing,
+ * flag is set to 1 if output buffer is valid, 0 otherwise */
+int dtcmp_randbcast(const void* inbuf, int weight, void* outbuf, int* flag, int count, MPI_Datatype type, MPI_Comm comm);
 
 int dtcmp_get_lt_eq_gt(
   const void* target,
@@ -288,6 +305,34 @@ int DTCMP_Select_local_randpartition(
   MPI_Datatype keysat,
   DTCMP_Op cmp,
   DTCMP_Flags hints
+);
+
+/* ---------------------------------------
+ * Select implementations
+ * --------------------------------------- */
+
+int DTCMP_Selectv_rand(
+  const void* buf,
+  int num,
+  int k,
+  void* item,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Comm comm
+);
+
+int DTCMP_Selectv_medianofmedians(
+  const void* buf,
+  int num,
+  int k,
+  void* item,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Comm comm
 );
 
 /* ---------------------------------------

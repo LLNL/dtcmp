@@ -121,6 +121,63 @@ int dtcmp_get_uint64t_min_max_sum(int count, uint64_t* min, uint64_t* max, uint6
   return DTCMP_SUCCESS;
 }
 
+int dtcmp_get_randroot(int count, int* flag, int* root, MPI_Comm comm)
+{
+  /* get a random value */
+  int rand = rand_r(&dtcmp_rand_seed);
+
+  /* get our rank */
+  int rank;
+  MPI_Comm_rank(comm, &rank);
+
+  /* initialize our input with our count, random value, and rank */
+  int input[3];
+  input[RANDROOT_COUNT] = count;
+  input[RANDROOT_RAND]  = rand;
+  input[RANDROOT_RANK]  = rank;
+
+  /* execute the allreduce */
+  int output[3];
+  MPI_Allreduce(input, output, 1, dtcmp_type_3int, dtcmp_reduceop_randroot, comm);
+
+  /* copy result to output parameter */
+  if (output[RANDROOT_COUNT] > 0) {
+    *flag = 1;
+    *root = output[RANDROOT_RANK];
+  } else {
+    *flag = 0;
+    *root = MPI_PROC_NULL;
+  }
+
+  return DTCMP_SUCCESS;
+}
+
+int dtcmp_randbcast(
+  const void* inbuf,
+  int weight,
+  void* outbuf,
+  int* flag,
+  int count,
+  MPI_Datatype type,
+  MPI_Comm comm)
+{
+  /* copy input data to output buffer */
+  if (weight > 0 && inbuf != MPI_IN_PLACE) {
+    DTCMP_Memcpy(outbuf, count, type, inbuf, count, type);
+  }
+
+  /* determine root */
+  int root;
+  dtcmp_get_randroot(weight, flag, &root, comm);
+
+  /* bcast value from root */
+  if (*flag) {
+    MPI_Bcast(outbuf, count, type, root, comm);
+  }
+
+  return DTCMP_SUCCESS;
+}
+
 int dtcmp_get_lt_eq_gt(
   const void* target,
   const void* buf,
@@ -236,4 +293,117 @@ int dtcmp_type_concat2(MPI_Datatype type1, MPI_Datatype type2, MPI_Datatype* new
   types[0] = type1;
   types[1] = type2;
   return dtcmp_type_concat(2, types, newtype);
+}
+
+/* when we compute the weighted median, we may get some median values
+ * that have a zero count.  We should avoid calling the compare function
+ * for these medians, as the actual value may be garbage, which may crash
+ * the comparator function, so we check the count before the median. */
+int dtcmp_count_with_key_cmp_fn(const void* a, const void* b)
+{
+  /* check that the counts for both elements are not zero,
+   * if a count is zero, consider that element to be higher
+   * (throws zeros to back of list) */
+  int count_a = *(int*) a;
+  int count_b = *(int*) b;
+  if (count_a != 0 && count_b != 0) {
+    /* both elements have non-zero counts,
+     * so compare the median values to each other */
+    return 0;
+  } else if (count_b != 0) {
+    /* count of first element is zero (but not the second),
+     * so say the first element is larger */
+    return 1;
+  } else if (count_a != 0) {
+    /* count of second element is zero (but not the first),
+     * so say the second element is larger */
+    return -1;
+  } else {
+    /* counts of both elements are zero, they are equivalent */
+    return 0;
+  }
+}
+
+int dtcmp_weighted_median(
+  const void* inbuf,
+  void* outbuf,
+  int count,
+  MPI_Datatype int_with_key,
+  DTCMP_Op cmp)
+{
+  int i;
+
+  /* get extent of each item */
+  MPI_Aint lb, extent;
+  MPI_Type_get_extent(int_with_key, &lb, &extent);
+
+  /* compute total number of elements */
+  int N = 0;
+  for (i = 0; i < count; i++) {
+    int cnt = *(int*) ((char*)inbuf + i * extent);
+    N += cnt;
+  }
+
+  /* identify the weighted median */
+  i = 0;
+  int before_weight = 0;
+  int half_weight   = N / 2;
+  const char* ptr = (const char*) inbuf;
+  void* target = (void*) (ptr + sizeof(int));
+  while(i < count) {
+    /* set our target to the current median
+     * and initialize our current weight */
+    target = (void*) (ptr + sizeof(int));
+    int current_weight = *(int*) ptr;
+    i++;
+    ptr += extent;
+
+    /* add weights for any elements which equal this current median */
+    if (i < count) {
+      int result;
+      int next_weight = *(int*) ptr;
+      if (next_weight > 0) {
+        void* next_target = (void*) (ptr + sizeof(int));
+        result = dtcmp_op_eval(target, next_target, cmp);
+      } else {
+        result = 0;
+      }
+      while (i < count && result == 0) {
+        /* current item is equal to target, add its weight */
+        current_weight += next_weight;
+        i++;
+        ptr += extent;
+
+        /* get weight and comparison result of next item if one exists */
+        if (i < count) {
+          next_weight = *(int*) ptr;
+          if (next_weight > 0) {
+            void* next_target = (void*) (ptr + sizeof(int));
+            result = dtcmp_op_eval(target, next_target, cmp);
+          } else {
+            result = 0;
+          }
+        }
+      }
+    }
+
+    /* determine if the weight before and after this value are
+     * each less than or equal to half */
+    int after_weight = N - before_weight - current_weight;
+    if (before_weight <= half_weight && after_weight <= half_weight) {
+      break;
+    }
+
+    /* after was too heavy, so add current weight to before
+     * and go to next value */
+    before_weight += current_weight;
+  }
+
+  /* set total number of active elements,
+   * and copy the median to our allgather send buffer */
+  int* num = (int*) outbuf;
+  *num = N;
+  memcpy((char*)outbuf + sizeof(int), target, extent - sizeof(int));
+
+  return DTCMP_SUCCESS;
 }

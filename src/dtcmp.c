@@ -36,6 +36,12 @@ MPI_Datatype dtcmp_type_3uint64t = MPI_DATATYPE_NULL;
 /* op for computing min/max/sum reduction */
 MPI_Op dtcmp_reduceop_mms_3uint64t = MPI_OP_NULL;
 
+/* we create a type of 3 consecutive int for computing max rand/count/rank reduction */
+MPI_Datatype dtcmp_type_3int = MPI_DATATYPE_NULL;
+
+/* op for computing max rand/count/rank reduction */
+MPI_Op dtcmp_reduceop_randroot = MPI_OP_NULL;
+
 /* we call rand_r() to acquire random numbers,
  * and this keeps track of the seed between calls */
 unsigned dtcmp_rand_seed = 0;
@@ -168,6 +174,52 @@ static void dtcmp_reducefn_uint64t_min_max_sum(void* invec, void* inoutvec, int*
   }
 }
 
+/* return maximum value, if counts > 0,
+ * compare random values first, then count, then rank as tie breakers */
+static void dtcmp_reducefn_randroot(void* invec, void* inoutvec, int* len, MPI_Datatype* type)
+{
+   /* the leading three values are integers */
+   int* a = (int*) invec;
+   int* b = (int*) inoutvec;
+
+   int i;
+   for (i = 0; i < *len; i++) {
+     /* assume that we'll use the value already in b */
+     int take_a = 0;
+
+     /* if at least one count is zero, our decision is easy */
+     if (a[RANDROOT_COUNT] == 0 || b[RANDROOT_COUNT] == 0) {
+       /* only take a if it's count is non-zero */
+       if (a[RANDROOT_COUNT] != 0) {
+         take_a = 1;
+       }
+     } else if (a[RANDROOT_RAND] > b[RANDROOT_RAND]) {
+       /* otherwise, both values are valid,
+        * take the greater of the two random values */
+       take_a = 1;
+     } else if (a[RANDROOT_RAND] == b[RANDROOT_RAND]) {
+       /* if random values are equal, take greater of count vaules */
+       if (a[RANDROOT_COUNT] > b[RANDROOT_COUNT]) {
+         take_a = 1;
+       } else if (a[RANDROOT_COUNT] == b[RANDROOT_COUNT]) {
+         /* and if counts are equal, use rank as the tie breaker */
+         if (a[RANDROOT_RANK] > b[RANDROOT_RANK]) {
+           take_a = 1;
+         }
+       }
+     }
+
+     /* copy a values into b */
+     if (take_a) {
+       memcpy(b, a, 3 * sizeof(int));
+     }
+
+     /* advance to next element */
+     a += 3;
+     b += 3;
+  }
+}
+
 /* initialize the sorting library */
 int DTCMP_Init()
 {
@@ -175,6 +227,11 @@ int DTCMP_Init()
   if (dtcmp_init_count == 0) {
     /* copy comm_self */
     MPI_Comm_dup(MPI_COMM_SELF, &dtcmp_comm_self);
+
+    /* intialize our random seed */
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    dtcmp_rand_seed = (unsigned) rank;
 
     /* set up a datatype for min/max/sum reduction */
     MPI_Type_contiguous(3, MPI_UINT64_T, &dtcmp_type_3uint64t);
@@ -185,6 +242,15 @@ int DTCMP_Init()
      * so assume this is commutative */
     int commutative = 1;
     MPI_Op_create(dtcmp_reducefn_uint64t_min_max_sum, commutative, &dtcmp_reduceop_mms_3uint64t);
+
+    /* set up a datatype for max rand/count/rank reduction */
+    MPI_Type_contiguous(3, MPI_INT, &dtcmp_type_3int);
+    MPI_Type_commit(&dtcmp_type_3int);
+
+    /* set up a reduction op to select the rank having a positive
+     * count and the max random value (break ties with count then
+     * rank), this is also commutative */
+    MPI_Op_create(dtcmp_reducefn_randroot, commutative, &dtcmp_reduceop_randroot);
 
     /* setup predefined cmp handles */
     DTCMP_Op_create(MPI_SHORT, dtcmp_op_fn_short_ascend,  &DTCMP_OP_SHORT_ASCEND);
@@ -282,9 +348,19 @@ int DTCMP_Finalize()
     DTCMP_Op_free(&DTCMP_OP_SHORT_DESCEND);
     DTCMP_Op_free(&DTCMP_OP_SHORT_ASCEND);
 
+    if (dtcmp_reduceop_randroot != MPI_OP_NULL) {
+      MPI_Op_free(&dtcmp_reduceop_randroot);
+      dtcmp_reduceop_randroot = MPI_OP_NULL;
+    }
+
     if (dtcmp_reduceop_mms_3uint64t != MPI_OP_NULL) {
       MPI_Op_free(&dtcmp_reduceop_mms_3uint64t);
       dtcmp_reduceop_mms_3uint64t = MPI_OP_NULL;
+    }
+
+    if (dtcmp_type_3int != MPI_DATATYPE_NULL) {
+      MPI_Type_free(&dtcmp_type_3int);
+      dtcmp_type_3int = MPI_DATATYPE_NULL;
     }
 
     if (dtcmp_type_3uint64t != MPI_DATATYPE_NULL) {
@@ -750,6 +826,7 @@ int DTCMP_Selectv(
    * with allreduce and split operations (to exclude procs with 0 counts) */
 
   /* otherwise use random pivot partitioning to narrow down on target rank */
+  return DTCMP_Selectv_rand(buf, num, k, item, key, keysat, cmp, hints, comm);
   return DTCMP_Selectv_medianofmedians(buf, num, k, item, key, keysat, cmp, hints, comm);
 }
 
