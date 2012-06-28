@@ -822,6 +822,13 @@ int DTCMP_Selectv(
 
 #endif
 
+  /* just call the local select if we only have one rank */
+  int ranks;
+  MPI_Comm_size(comm, &ranks);
+  if (ranks < 2) {
+    return DTCMP_Select_local(buf, num, k, item, key, keysat, cmp, hints);
+  }
+
   /* TODO: add Christian Siebert's median selection, which can be cleanly done
    * with allreduce and split operations (to exclude procs with 0 counts) */
 
@@ -856,9 +863,9 @@ int DTCMP_Sort_local(
 
   /* TODO: select algorithm based on number of elements */
 
-  return DTCMP_Sort_local_randquicksort(inbuf, outbuf, count, key, keysat, cmp, hints);
-  return DTCMP_Sort_local_insertionsort(inbuf, outbuf, count, key, keysat, cmp, hints);
   return DTCMP_Sort_local_mergesort(inbuf, outbuf, count, key, keysat, cmp, hints);
+  return DTCMP_Sort_local_insertionsort(inbuf, outbuf, count, key, keysat, cmp, hints);
+  return DTCMP_Sort_local_randquicksort(inbuf, outbuf, count, key, keysat, cmp, hints);
 
   /* if keysat is valid type and if function is basic, we can just call qsort */
   dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) cmp;
@@ -1025,10 +1032,10 @@ int DTCMP_Sortz(
 int DTCMP_Rankv(
   int count,
   const void* buf,
-  int* groups,
-  int  group_id[],
-  int  group_ranks[],
-  int  group_rank[],
+  uint64_t* groups,
+  uint64_t  group_id[],
+  uint64_t  group_ranks[],
+  uint64_t  group_rank[],
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
@@ -1059,10 +1066,10 @@ int DTCMP_Rankv(
 int DTCMP_Rankv_strings(
   int count,
   const char* strings[],
-  int* groups,
-  int  group_id[],
-  int  group_ranks[],
-  int  group_rank[],
+  uint64_t* groups,
+  uint64_t  group_id[],
+  uint64_t  group_ranks[],
+  uint64_t  group_rank[],
   DTCMP_Flags hints,
   MPI_Comm comm)
 {

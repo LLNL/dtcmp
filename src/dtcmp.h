@@ -27,6 +27,7 @@
 #define DTCMP_H_
 
 #include <stdlib.h>
+#include <stdint.h>
 #include "mpi.h"
 
 /* define a C interface */
@@ -523,15 +524,15 @@ int DTCMP_Rankv(
                         *       process (non-negative integer) */
   const void* buf,     /* IN  - start of buffer containing input
                         *       key/satellite items */
-  int* groups,         /* OUT - number of distinct items
+  uint64_t* groups,         /* OUT - number of distinct items
                         *       (non-negative integer) */
-  int  group_id[],     /* OUT - group identifier corresponding to
+  uint64_t  group_id[],     /* OUT - group identifier corresponding to
                         *       each input item (array of
                         *       non-negative integer of length count) */
-  int  group_ranks[],  /* OUT - number of items within group of
+  uint64_t  group_ranks[],  /* OUT - number of items within group of
                         *       each input item (array of
                         *       non-negative integers of length count) */
-  int  group_rank[],   /* OUT - rank of each input item within its
+  uint64_t  group_rank[],   /* OUT - rank of each input item within its
                         *       group (array of non-negative
                         *       integers of length count) */
   MPI_Datatype key,    /* IN  - datatype of key (handle) */
@@ -549,15 +550,15 @@ int DTCMP_Rankv_strings(
                           *       process (non-negative integer) */
   const char* strings[], /* IN  - array of pointers to each string
                           *       (array of length count) */
-  int* groups,           /* OUT - number of distinct strings
+  uint64_t* groups,           /* OUT - number of distinct strings
                           *       (non-negative integer) */
-  int group_id[],        /* OUT - group identifier corresponding to
+  uint64_t group_id[],        /* OUT - group identifier corresponding to
                           *       each input item (array of
                           *       non-negative integer of length count) */
-  int group_ranks[],     /* OUT - number of items within group of
+  uint64_t group_ranks[],     /* OUT - number of items within group of
                           *       each input item (array of
                           *       non-negative integers of length count) */
-  int group_rank[],      /* OUT - rank of each input item within its
+  uint64_t group_rank[],      /* OUT - rank of each input item within its
                           *       group (array of non-negative
                           *       integers of length count) */
   DTCMP_Flags hints,     /* IN  - hints/assertions (bit flags) */

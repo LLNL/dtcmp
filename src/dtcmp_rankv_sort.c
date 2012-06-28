@@ -236,8 +236,8 @@ static int detect_edges(
 static int assign_ids(
   const int leading[],
   int num,
-  int groups_and_ranks[],
-  int* num_groups,
+  uint64_t groups_and_ranks[],
+  uint64_t* num_groups,
   MPI_Comm comm)
 {
   int i;
@@ -247,18 +247,23 @@ static int assign_ids(
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &ranks);
 
+  /* since we pack integer ranks (including MPI_PROC_NULL, often < 0)
+   * into an unsigned 64bit integer, we use 0 to represent NULL and
+   * shift all MPI ranks up by one */
+  uint64_t SHIFTED_MPI_PROC_NULL = 0;
+
   /* declare buffers for our scan operations */
-  int send_left_ints[4]   = {0,0,0,MPI_PROC_NULL};
-  int send_right_ints[4]  = {0,0,0,MPI_PROC_NULL};
-  int recv_left_ints[4]   = {0,0,0,MPI_PROC_NULL};
-  int recv_right_ints[4]  = {0,0,0,MPI_PROC_NULL};
-  int total_left_ints[4]  = {0,0,0,MPI_PROC_NULL};
-  int total_right_ints[4] = {0,0,0,MPI_PROC_NULL};
+  uint64_t send_left_ints[4]   = {0,0,0,SHIFTED_MPI_PROC_NULL};
+  uint64_t send_right_ints[4]  = {0,0,0,SHIFTED_MPI_PROC_NULL};
+  uint64_t recv_left_ints[4]   = {0,0,0,SHIFTED_MPI_PROC_NULL};
+  uint64_t recv_right_ints[4]  = {0,0,0,SHIFTED_MPI_PROC_NULL};
+  uint64_t total_left_ints[4]  = {0,0,0,SHIFTED_MPI_PROC_NULL};
+  uint64_t total_right_ints[4] = {0,0,0,SHIFTED_MPI_PROC_NULL};
 
   /* allocate arrays to track number of groups and ranks
    * for each of our elements */
-  int* counts_left  = dtcmp_malloc(2 * sizeof(int) * num, 0, __FILE__, __LINE__);
-  int* counts_right = dtcmp_malloc(2 * sizeof(int) * num, 0, __FILE__, __LINE__);
+  int* counts_left  = dtcmp_malloc(2 * sizeof(uint64_t) * num, 0, __FILE__, __LINE__);
+  int* counts_right = dtcmp_malloc(2 * sizeof(uint64_t) * num, 0, __FILE__, __LINE__);
 
   /* run through the elements we have locally and prepare
    * out left-to-right and right-to-left scan items */
@@ -303,7 +308,11 @@ static int assign_ids(
       MPI_Irecv(recv_left_ints, 4, MPI_INT, left_rank, 0, comm, &request[k]);
       k++;
 
-      send_left_ints[ASSIGN_NEXT] = right_rank;
+      if (right_rank != MPI_PROC_NULL) {
+        send_left_ints[ASSIGN_NEXT] = (uint64_t) right_rank + 1;
+      } else {
+        send_left_ints[ASSIGN_NEXT] = SHIFTED_MPI_PROC_NULL;
+      }
       MPI_Isend(send_left_ints, 4, MPI_INT, left_rank, 0, comm, &request[k]);
       k++;
     }
@@ -313,7 +322,11 @@ static int assign_ids(
       MPI_Irecv(recv_right_ints, 4, MPI_INT, right_rank, 0, comm, &request[k]);
       k++;
 
-      send_right_ints[ASSIGN_NEXT] = left_rank;
+      if (left_rank != MPI_PROC_NULL) {
+        send_right_ints[ASSIGN_NEXT] = (uint64_t) left_rank + 1;
+      } else {
+        send_right_ints[ASSIGN_NEXT] = SHIFTED_MPI_PROC_NULL;
+      } 
       MPI_Isend(send_right_ints, 4, MPI_INT, right_rank, 0, comm, &request[k]);
       k++;
     }
@@ -340,7 +353,11 @@ static int assign_ids(
       send_right_ints[ASSIGN_GROUPS] += recv_left_ints[ASSIGN_GROUPS];
 
       /* get the next rank on the left */
-      left_rank = recv_left_ints[ASSIGN_NEXT];
+      if (recv_left_ints[ASSIGN_NEXT] != SHIFTED_MPI_PROC_NULL) {
+        left_rank = (int) recv_left_ints[ASSIGN_NEXT] - 1;
+      } else {
+        left_rank = MPI_PROC_NULL;
+      }
     }
 
     /* reduce data from right partner */
@@ -360,7 +377,11 @@ static int assign_ids(
       send_left_ints[ASSIGN_GROUPS] += recv_right_ints[ASSIGN_GROUPS];
 
       /* get the next rank on the left */
-      right_rank = recv_right_ints[ASSIGN_NEXT];
+      if (recv_right_ints[ASSIGN_NEXT] != SHIFTED_MPI_PROC_NULL) {
+        right_rank = (int) recv_right_ints[ASSIGN_NEXT] - 1;
+      } else {
+        right_rank = MPI_PROC_NULL;
+      }
     }
   }
 
@@ -392,7 +413,7 @@ static int assign_ids(
     int GAR_GROUP_ID  = 0;
     int GAR_RANK_ID   = 1;
     int GAR_NUM_RANKS = 2;
-    int* gar = groups_and_ranks;
+    uint64_t* gar = groups_and_ranks;
     for (i = 0; i < num; i++) {
         gar[GAR_GROUP_ID]  = counts_left[i*2 + 0] - 1;
         gar[GAR_RANK_ID]   = counts_left[i*2 + 1] - 1;
@@ -424,10 +445,10 @@ static int assign_ids(
 int DTCMP_Rankv_sort(
   int count,
   const void* buf,
-  int* groups,
-  int  group_id[],
-  int  group_ranks[],
-  int  group_rank[],
+  uint64_t* groups,
+  uint64_t  group_id[],
+  uint64_t  group_ranks[],
+  uint64_t  group_rank[],
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
@@ -459,6 +480,15 @@ int DTCMP_Rankv_sort(
   MPI_Aint key_true_lb, key_true_extent;
   MPI_Type_get_true_extent(key, &key_true_lb, &key_true_extent);
 
+  /* build items to be sorted with return address */
+  size_t sort_size   = key_true_extent + 2 * sizeof(int);
+  size_t return_size = 5 * sizeof(uint64_t);
+  char* sortbuf   = dtcmp_malloc(count * sort_size, 0, __FILE__, __LINE__);
+  char* returnbuf = dtcmp_malloc(count * return_size, 0, __FILE__, __LINE__);
+  int*  first_in_group = dtcmp_malloc(count * sizeof(int), 0, __FILE__, __LINE__);
+  int*  last_in_group  = dtcmp_malloc(count * sizeof(int), 0, __FILE__, __LINE__);
+  uint64_t* sorted_group_and_ranks = dtcmp_malloc(3 * count * sizeof(uint64_t), 0, __FILE__, __LINE__);
+
   /* create type to be sorted: key, then rank (int), then index (int) */
   MPI_Datatype type_item;
   MPI_Datatype types[3];
@@ -469,18 +499,12 @@ int DTCMP_Rankv_sort(
 
   /* create our comparison operation for sorting:
    * sort by key, then rank, then index */
-  DTCMP_Op cmp_2int, cmp_item;
-  DTCMP_Op_create_series2(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_ASCEND, &cmp_2int);
-  DTCMP_Op_create_series2(cmp, cmp_2int, &cmp_item);
-
-  /* build items to be sorted with return address */
-  size_t sort_size   = key_true_extent + 2 * sizeof(int);
-  size_t return_size = 5 * sizeof(int);
-  char* sortbuf   = dtcmp_malloc(count * sort_size, 0, __FILE__, __LINE__);
-  char* returnbuf = dtcmp_malloc(count * return_size, 0, __FILE__, __LINE__);
-  int*  first_in_group = dtcmp_malloc(count * sizeof(int), 0, __FILE__, __LINE__);
-  int*  last_in_group  = dtcmp_malloc(count * sizeof(int), 0, __FILE__, __LINE__);
-  int*  sorted_group_and_ranks = dtcmp_malloc(3 * count * sizeof(int), 0, __FILE__, __LINE__);
+  DTCMP_Op cmp_item;
+  DTCMP_Op ops[3];
+  ops[0] = cmp;
+  ops[1] = DTCMP_OP_INT_ASCEND;
+  ops[2] = DTCMP_OP_INT_ASCEND;
+  DTCMP_Op_create_series(3, ops, &cmp_item);
 
   /* copy our items into our temporary buffer for sorting */
   char* sortptr = sortbuf;
@@ -507,7 +531,7 @@ int DTCMP_Rankv_sort(
     rc = tmp_rc;
   }
 
-  /* detect edges across sorted itemsi, note we pass in the full items,
+  /* detect edges across sorted items, note we pass in the full items,
    * which includes (key,rank,index) but we just use the key cmp operation */
   tmp_rc = detect_edges(
     sortbuf, count, type_item, cmp, hints,
@@ -519,7 +543,7 @@ int DTCMP_Rankv_sort(
 
   /* execute scan to determine group info: total number of groups and
    * group_id, group_ranks, and group_rank for each item */
-  int num_groups;
+  uint64_t num_groups;
   tmp_rc = assign_ids(
     first_in_group, count,
     sorted_group_and_ranks, &num_groups, comm
@@ -531,21 +555,25 @@ int DTCMP_Rankv_sort(
   /* build types for return items, each item contains
    * rank/index/groupid/grouprank/groupindex,
    * and they're sorted by the leading rank/index pair */
-  MPI_Datatype type_2int, type_5int;
-  MPI_Type_contiguous(2, MPI_INT, &type_2int);
-  MPI_Type_contiguous(5, MPI_INT, &type_5int);
-  MPI_Type_commit(&type_2int);
-  MPI_Type_commit(&type_5int);
+  MPI_Datatype type_2uint64t, type_5uint64t;
+  MPI_Type_contiguous(2, MPI_UINT64_T, &type_2uint64t);
+  MPI_Type_contiguous(5, MPI_UINT64_T, &type_5uint64t);
+  MPI_Type_commit(&type_2uint64t);
+  MPI_Type_commit(&type_5uint64t);
+
+  /* build a op to sort by rank then by local index on that rank */
+  DTCMP_Op cmp_2uint64t;
+  DTCMP_Op_create_series2(DTCMP_OP_UINT64T_ASCEND, DTCMP_OP_UINT64T_ASCEND, &cmp_2uint64t);
 
   /* build return items */
   sortptr = sortbuf + key_true_extent;
-  int* retptr = (int*) returnbuf;
-  int* sgar = sorted_group_and_ranks;
+  uint64_t* retptr = (uint64_t*) returnbuf;
+  uint64_t* sgar = sorted_group_and_ranks;
   for (i = 0; i < count; i++) {
     /* set the rank and index, which we extract from the sorted items */
     int* indicies = (int*) sortptr;
-    retptr[0] = indicies[0];
-    retptr[1] = indicies[1];
+    retptr[0] = (uint64_t) indicies[0];
+    retptr[1] = (uint64_t) indicies[1];
 
     /* set the groupid/grouprank/groupranks values for each item */
     retptr[2] = sgar[0];
@@ -562,14 +590,14 @@ int DTCMP_Rankv_sort(
   /* sort back to sender */
   tmp_rc = DTCMP_Sortv(
     DTCMP_IN_PLACE, returnbuf, count,
-    type_2int, type_5int, cmp_2int, hints, comm
+    type_2uint64t, type_5uint64t, cmp_2uint64t, hints, comm
   );
   if (tmp_rc != DTCMP_SUCCESS) {
     rc = tmp_rc;
   }
 
   /* copy values into output arrays */
-  int* gar = (int*) returnbuf;
+  uint64_t* gar = (uint64_t*) returnbuf;
   for (i = 0; i < count; i++) {
     group_id[i]    = gar[2];
     group_rank[i]  = gar[3];
@@ -586,11 +614,11 @@ int DTCMP_Rankv_sort(
   dtcmp_free(&last_in_group);
   dtcmp_free(&sorted_group_and_ranks);
 
-  DTCMP_Op_free(&cmp_2int);
+  DTCMP_Op_free(&cmp_2uint64t);
   DTCMP_Op_free(&cmp_item);
 
-  MPI_Type_free(&type_2int);
-  MPI_Type_free(&type_5int);
+  MPI_Type_free(&type_2uint64t);
+  MPI_Type_free(&type_5uint64t);
   MPI_Type_free(&type_item);
 
   return rc;
@@ -599,10 +627,10 @@ int DTCMP_Rankv_sort(
 int DTCMP_Rankv_strings_sort(
   int count,
   const char* strings[],
-  int* groups,
-  int  group_id[],
-  int  group_ranks[],
-  int  group_rank[],
+  uint64_t* groups,
+  uint64_t  group_id[],
+  uint64_t  group_ranks[],
+  uint64_t  group_rank[],
   DTCMP_Flags hints,
   MPI_Comm comm)
 {

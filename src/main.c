@@ -9,6 +9,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 
 #include "mpi.h"
 #include "dtcmp.h"
@@ -52,14 +53,14 @@ int main(int argc, char* argv[])
     printf("%d: item %d = %d\n", rank, i, outbuf[i]);
   }
 
-  int num_groups, group_ids[SIZE], group_ranks[SIZE], group_rank[SIZE];
+  uint64_t num_groups, group_ids[SIZE], group_ranks[SIZE], group_rank[SIZE];
   DTCMP_Rankv(
     size, inbuf,
     &num_groups, group_ids, group_ranks, group_rank,
     MPI_INT, MPI_INT, DTCMP_OP_INT_DESCEND, DTCMP_FLAG_NONE, MPI_COMM_WORLD
   );
   for (i = 0; i < size; i++) {
-    printf("%d: item %d = %d, groups=%d, group=%d, ranks=%d, rank=%d\n",
+    printf("%d: item %d = %d, groups=%lu, group=%lu, ranks=%lu, rank=%lu\n",
       rank, i, inbuf[i], num_groups, group_ids[i], group_ranks[i], group_rank[i]
     );
   }
@@ -71,7 +72,7 @@ int main(int argc, char* argv[])
     DTCMP_FLAG_NONE, MPI_COMM_WORLD
   );
   for (i = 0; i < size; i++) {
-    printf("%d: item %d = %s, groups=%d, group=%d, ranks=%d, rank=%d\n",
+    printf("%d: item %d = %s, groups=%lu, group=%lu, ranks=%lu, rank=%lu\n",
       rank, i, strings[i], num_groups, group_ids[i], group_ranks[i], group_rank[i]
     );
   }

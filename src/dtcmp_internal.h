@@ -480,10 +480,10 @@ int DTCMP_Sortz_samplesort(
 int DTCMP_Rankv_sort(
   int count,
   const void* buf,
-  int* groups,
-  int  group_id[],
-  int  group_ranks[],
-  int  group_rank[],
+  uint64_t* groups,
+  uint64_t  group_id[],
+  uint64_t  group_ranks[],
+  uint64_t  group_rank[],
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
@@ -494,10 +494,10 @@ int DTCMP_Rankv_sort(
 int DTCMP_Rankv_strings_sort(
   int count,
   const char* strings[],
-  int* groups,
-  int  group_id[],
-  int  group_ranks[],
-  int  group_rank[],
+  uint64_t* groups,
+  uint64_t  group_id[],
+  uint64_t  group_ranks[],
+  uint64_t  group_rank[],
   DTCMP_Flags hints,
   MPI_Comm comm
 );

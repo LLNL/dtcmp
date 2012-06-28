@@ -16,10 +16,23 @@
 
 #define SIZE (50)
 
+typedef int(*selectv_fn)(const void* inbuf, int size, int kth, void* outbuf, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op op, DTCMP_Flags hints, MPI_Comm comm);
 typedef int(*sort_local_fn)(const void* inbuf, void* outbuf, int size, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op op, DTCMP_Flags hints);
 typedef int(*sort_fn)(const void* inbuf, void* outbuf, int size, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op op, DTCMP_Flags hints, MPI_Comm comm);
 typedef int(*sortv_fn)(const void* inbuf, void* outbuf, int size, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op op, DTCMP_Flags hints, MPI_Comm comm);
 typedef int(*sortz_fn)(const void* inbuf, int incount, void** outbuf, int* outcount, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op op, DTCMP_Flags hints, MPI_Comm comm, DTCMP_Handle* handle);
+
+#define NUM_SELECTV_FNS (3)
+selectv_fn selectv_fns[NUM_SELECTV_FNS] = {
+  DTCMP_Selectv,
+  DTCMP_Selectv_rand,
+  DTCMP_Selectv_medianofmedians,
+};
+char* selectv_names[NUM_SELECTV_FNS] = {
+  "DTCMP_Selectv",
+  "DTCMP_Selectv_rand",
+  "DTCMP_Selectv_medianofmedians",
+};
 
 #define NUM_SORT_LOCAL_FNS (5)
 sort_local_fn sort_local_fns[NUM_SORT_LOCAL_FNS] = {
@@ -72,6 +85,56 @@ char* sortz_names[NUM_SORTZ_FNS] = {
   "DTCMP_Sortz",
   "DTCMP_Sortz_samplesort",
 };
+
+int test_selectv(
+  const char* test,
+  selectv_fn fn,
+  const char* name,
+  const void* inbuf,
+  int size,
+  int k,
+  void* outbuf,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Comm comm)
+{
+  (*fn)(inbuf, size, k, outbuf, key, keysat, cmp, hints, comm);
+
+  uint64_t lt, eq, gt;
+  dtcmp_get_lt_eq_gt(outbuf, inbuf, size, key, keysat, cmp, hints, &lt, &eq, &gt, comm);
+
+  if (k <= lt || k > (lt + eq)) {
+    int rank;
+    MPI_Comm_rank(comm, &rank);
+    if (rank == 0) {
+      printf("ERROR DETECTED rank=%d test=%s routine=%s\n", rank, test, name);
+    }
+  }
+  return 0;
+}
+
+int test_all_selectv(
+  const char* test,
+  int k,
+  void* outbuf,
+  const void* inbuf,
+  int size,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Comm comm)
+{
+  int i;
+
+  for (i = 0; i < NUM_SELECTV_FNS; i++) {
+    test_selectv(test, selectv_fns[i], selectv_names[i], inbuf, size, k, outbuf, key, keysat, cmp, hints, comm);
+  }
+
+  return 0;
+}
 
 int test_sort_local(
   const char* test,
@@ -238,33 +301,6 @@ int test_variable_sorts(
   return 0;
 }
 
-int is_kth(
-  const char* test,
-  int k,
-  const void* item,
-  const void* buf,
-  int size,
-  MPI_Datatype key,
-  MPI_Datatype keysat,
-  DTCMP_Op cmp,
-  DTCMP_Flags hints,
-  MPI_Comm comm)
-{
-  uint64_t lt, eq, gt;
-  dtcmp_get_lt_eq_gt(item, buf, size, key, keysat, cmp, hints, &lt, &eq, &gt, comm);
-
-  if (k <= lt || k > (lt + eq)) {
-    int rank;
-    MPI_Comm_rank(comm, &rank);
-    if (rank == 0) {
-      //printf("ERROR DETECTED rank=%d test=%s routine=%s\n", rank, test, name);
-      printf("ERROR DETECTED is_kth\n");
-    }
-  }
-
-  return 0;
-}
-
 int main(int argc, char* argv[])
 {
   int i;
@@ -346,14 +382,11 @@ DTCMP_Op_create_series(4, series, &series4);
   test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, hints, comm);
 
 kth = 1;
-DTCMP_Selectv(inbuf, size, kth, outbuf, key, keysat, op, hints, comm);
-is_kth(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
+test_all_selectv(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
 kth = (ranks*size/2)+1;
-DTCMP_Selectv(inbuf, size, kth, outbuf, key, keysat, op, hints, comm);
-is_kth(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
+test_all_selectv(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
 kth = ranks*size;
-DTCMP_Selectv(inbuf, size, kth, outbuf, key, keysat, op, hints, comm);
-is_kth(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
+test_all_selectv(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
 
   /* test that all sorts work with count>1 on all procs */
   size = SIZE;
@@ -365,14 +398,11 @@ is_kth(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
   test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, hints, comm);
 
 kth = 1;
-DTCMP_Selectv(inbuf, size, kth, outbuf, key, keysat, op, hints, comm);
-is_kth(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
+test_all_selectv(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
 kth = (ranks*size/2)+1;
-DTCMP_Selectv(inbuf, size, kth, outbuf, key, keysat, op, hints, comm);
-is_kth(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
+test_all_selectv(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
 kth = ranks*size;
-DTCMP_Selectv(inbuf, size, kth, outbuf, key, keysat, op, hints, comm);
-is_kth(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
+test_all_selectv(test, kth, outbuf, inbuf, size, key, keysat, op, hints, comm);
 
   for (i = 0; i < SIZE; i++) {
     in_1int[i]  = 1;
