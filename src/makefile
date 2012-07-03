@@ -14,7 +14,8 @@ OBJS= \
   dtcmp_ops.o \
   dtcmp_uniqify.o \
   dtcmp_search_binary.o \
-  dtcmp_partition.o \
+  dtcmp_partitionz.o \
+  dtcmp_partition_local.o \
   dtcmp_merge_2way.o \
   dtcmp_merge_kway_heap.o \
   dtcmp_select_local_ends.o \

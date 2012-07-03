@@ -8,6 +8,7 @@
  * Please also read this file: LICENSE.TXT. */
 
 #include <stdlib.h>
+#include <string.h>
 #include "mpi.h"
 #include "dtcmp_internal.h"
 #include "dtcmp_ops.h"
@@ -700,6 +701,8 @@ int DTCMP_Partition_local(
     return DTCMP_FAILURE;
   }
 
+  /* TODO: if buffer is already ordered, just invoke binary search */
+
   /* TODO: if we determine key and keysat don't have holes,
    * we could call the memcpy routine instead */
 
@@ -765,6 +768,8 @@ int DTCMP_Select_local(
   if (! dtcmp_type_is_valid(keysat)) {
     return DTCMP_FAILURE;
   }
+
+  /* TODO: if buffer is already ordered, then just return buf[k] */
 
   /* if k == 0 or k == num-1, special case this by finding
    * the minimum or maximum, which we can do in a single sweep

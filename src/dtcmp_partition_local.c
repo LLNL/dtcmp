@@ -106,7 +106,7 @@ int DTCMP_Partition_local_dtcpy(
 
   /* get true extent of keysat datatype */
   MPI_Aint true_lb, true_extent;
-  MPI_Type_get_extent(keysat, &true_lb, &true_extent);
+  MPI_Type_get_true_extent(keysat, &true_lb, &true_extent);
 
   /* allocate enough space to hold one keysat type */
   void* scratch = dtcmp_malloc(true_extent, 0, __FILE__, __LINE__);
@@ -152,6 +152,70 @@ int DTCMP_Partition_local_dtcpy(
 
   /* set output pivot position */
   *outpivot = divide;
+
+  /* free memory */
+  dtcmp_free(&scratch);
+
+  return 0;
+}
+
+int DTCMP_Partition_local_target_dtcpy(
+  void* buf,
+  int count,
+  const void* target,
+  int* outdivide,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
+{
+  /* get extent of keysat datatype */
+  MPI_Aint lb, extent;
+  MPI_Type_get_extent(keysat, &lb, &extent);
+
+  /* get true extent of keysat datatype */
+  MPI_Aint true_lb, true_extent;
+  MPI_Type_get_true_extent(keysat, &true_lb, &true_extent);
+
+  /* allocate enough space to hold one keysat type */
+  void* scratch = dtcmp_malloc(true_extent, 0, __FILE__, __LINE__);
+
+  /* swap pivot element with last element */
+  char* lastbuf = (char*)buf + count * extent;
+  
+  /* move small elements to left side and large elements to right side of array,
+   * split equal elements evenly on either side of pivot */
+  int jumpball_arrow = 0; /* basketball reference */
+  int divide = 0;
+  char* dividebuf = buf;  /* tracks element dividing small and large sides */
+  char* itembuf   = buf;
+  while (itembuf != lastbuf) {
+    /* compare current item to pivot */
+    int result = dtcmp_op_eval(itembuf, target, cmp);
+    if (result < 0) {
+      /* current element is smaller than pivot,
+       * swap this element with the one at the divide and advance divide pointer */
+      DTCMP_Swap(itembuf, dividebuf, scratch, keysat);
+      dividebuf += extent;
+      divide++;
+    } else if (result == 0) {
+      /* we put every other equal element on left side */
+      if (jumpball_arrow) {
+        /* swap this element with the one at the divide and advance divide pointer */
+        DTCMP_Swap(itembuf, dividebuf, scratch, keysat);
+        dividebuf += extent;
+        divide++;
+      }
+      /* flip the jumpball arrow for the next tie */
+      jumpball_arrow ^= 0x1;
+    }
+
+    /* advance pointer to next item */
+    itembuf += extent;
+  }
+
+  /* set output pivot position */
+  *outdivide = divide;
 
   /* free memory */
   dtcmp_free(&scratch);

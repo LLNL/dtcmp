@@ -476,11 +476,16 @@ DTCMP_Selectv(inbuf, size, (ranks*size/1), outbuf, key, keysat, op, hints, comm)
   op = DTCMP_OP_INT_DESCEND;
   test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, hints, comm);
 
+void* partbuf;
+int partcount;
+DTCMP_Handle handle;
   /* test that all sorts work with count>1 on all procs */
   size = SIZE;
   test = "SIZE INT/2INT ASCEND";
   op = DTCMP_OP_INT_ASCEND;
   test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, hints, comm);
+DTCMP_Partitionz(inbuf, size, size*ranks/2+1, ranks/2, &partbuf, &partcount, key, keysat, op, hints, comm, &handle);
+DTCMP_Free(&handle);
   test = "SIZE INT/2INT DESCEND";
   op = DTCMP_OP_INT_DESCEND;
   test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, hints, comm);
@@ -526,6 +531,8 @@ DTCMP_Selectv(inbuf, size, (ranks*size/1), outbuf, key, keysat, op, hints, comm)
   test = "1-10 INT/2INT ASCEND";
   op = DTCMP_OP_INT_ASCEND;
   test_variable_sorts(test, inbuf, outbuf, size, key, keysat, op, hints, comm);
+DTCMP_Partitionz(inbuf, size, 6, ranks/2, &partbuf, &partcount, key, keysat, op, hints, comm, &handle);
+DTCMP_Free(&handle);
   test = "1-10 INT/2INT DESCEND";
   op = DTCMP_OP_INT_DESCEND;
   test_variable_sorts(test, inbuf, outbuf, size, key, keysat, op, hints, comm);

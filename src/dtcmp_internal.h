@@ -234,6 +234,17 @@ int DTCMP_Partition_local_dtcpy(
   DTCMP_Flags hints
 );
 
+int DTCMP_Partition_local_target_dtcpy(
+  void* buf,
+  int count,
+  const void* target,
+  int* outdivide,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
+);
+
 /* ---------------------------------------
  * Merge implementations
  * --------------------------------------- */
