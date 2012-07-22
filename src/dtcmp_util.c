@@ -275,9 +275,14 @@ int dtcmp_type_concat(int num, const MPI_Datatype oldtypes[], MPI_Datatype* newt
     disp += true_extent;
   }
 
+  /* TODO: need to replace this eventually so we can place types
+   * at their proper alignment boundaries for better performance */
   /* create and commit the new type */
-  MPI_Type_create_struct(num, blocklens, displs, types, newtype);
+  MPI_Datatype aligned_type;
+  MPI_Type_create_struct(num, blocklens, displs, types, &aligned_type);
+  MPI_Type_create_resized(aligned_type, 0, disp, newtype);
   MPI_Type_commit(newtype);
+  MPI_Type_free(&aligned_type);
 
   /* free memory */
   dtcmp_free(&types);

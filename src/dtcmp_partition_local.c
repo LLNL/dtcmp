@@ -156,14 +156,14 @@ int DTCMP_Partition_local_dtcpy(
   /* free memory */
   dtcmp_free(&scratch);
 
-  return 0;
+  return DTCMP_SUCCESS;
 }
 
 int DTCMP_Partition_local_target_dtcpy(
   void* buf,
   int count,
   const void* target,
-  int* outdivide,
+  int* outindex,
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
@@ -215,10 +215,71 @@ int DTCMP_Partition_local_target_dtcpy(
   }
 
   /* set output pivot position */
-  *outdivide = divide;
+  *outindex = divide;
 
   /* free memory */
   dtcmp_free(&scratch);
 
   return 0;
+}
+
+int DTCMP_Partition_local_target_list_dtcpy(
+  void* buf,
+  int count,
+  int offset,
+  int num,
+  const void* targets,
+  int indicies[],
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
+{
+  /* TODO: shortcut to search if buf is ordered */
+
+  /* get extent of key datatype */
+  MPI_Aint key_lb, key_extent;
+  MPI_Type_get_extent(key, &key_lb, &key_extent);
+
+  /* get extent of keysat datatype */
+  MPI_Aint keysat_lb, keysat_extent;
+  MPI_Type_get_extent(keysat, &keysat_lb, &keysat_extent);
+
+  /* select middle target */
+  int mid = num / 2;
+  char* target = (char*)targets + mid * key_extent;
+
+  /* partition array by middle target, returns index within
+   * array where target would be after partitioning if it exists */
+  int index;
+  DTCMP_Partition_local_target_dtcpy(
+    buf, count, target, &index,
+    key, keysat, cmp, hints
+  );
+  indicies[mid] = offset + index;
+
+  /* recursively partition lower array */
+  if (mid > 0) {
+    DTCMP_Partition_local_target_list_dtcpy(
+      buf, index, offset, mid, targets, indicies,
+      key, keysat, cmp, hints
+    );
+  }
+
+  /* recursively partition upper array */
+  char* upper_buf  = (char*)buf + index * keysat_extent;
+  int upper_count  = count - index;
+  int upper_offset = offset + index;
+  int upper_index  = mid + 1;
+  int upper_num    = num - upper_index;
+  char* upper_targets = (char*)targets + upper_index * key_extent;
+  if (upper_num > 0) {
+    DTCMP_Partition_local_target_list_dtcpy(
+      upper_buf, upper_count, upper_offset,
+      upper_num, upper_targets, indicies + upper_index,
+      key, keysat, cmp, hints
+    );
+  }
+  
+  return DTCMP_SUCCESS;
 }

@@ -40,7 +40,7 @@
 static int find_kth_item(
   const void* data,
   int n,
-  int k,
+  uint64_t k,
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
@@ -103,7 +103,7 @@ static int find_kth_item(
     }
 
     /* if we don't have any active elements, set counts to 0 */
-    int counts[2];
+    uint64_t counts[2];
     if (num == 0) {
       counts[LT] = 0;
       counts[EQ] = 0;
@@ -118,23 +118,23 @@ static int find_kth_item(
       int flag, lowest, highest;
       DTCMP_Search_low_local(target,  data, start_index, end_index, key, keysat, cmp, hints, &flag, &lowest);
       DTCMP_Search_high_local(target, data, lowest,      end_index, key, keysat, cmp, hints, &flag, &highest);
-      counts[LT] = lowest - start_index;
-      counts[EQ] = (highest + 1) - lowest;
+      counts[LT] = (uint64_t) (lowest - start_index);
+      counts[EQ] = (uint64_t) ((highest + 1) - lowest);
     }
 
     /* now get global counts across all procs */
-    int all_counts[2];
-    MPI_Allreduce(counts, all_counts, 2, MPI_INT, MPI_SUM, comm);
+    uint64_t all_counts[2];
+    MPI_Allreduce(counts, all_counts, 2, MPI_UINT64_T, MPI_SUM, comm);
 
     /* based on current median, chop down our active range */
     if (k <= all_counts[LT]) {
       /* the target is in the lower portion,
        * exclude all entries equal to or greater than */
-      num = counts[LT];
+      num = (int) counts[LT];
     } else if (k > (all_counts[LT] + all_counts[EQ])){
       /* the target is in the higher portion,
        * exclude all entries equal to or less than */
-      int num_lte = counts[LT] + counts[EQ];
+      int num_lte = (int) (counts[LT] + counts[EQ]);
       index += num_lte;
       num   -= num_lte;
       k = k - (all_counts[LT] + all_counts[EQ]);
@@ -162,7 +162,7 @@ static int find_kth_item(
 int DTCMP_Selectv_rand(
   const void* buf,
   int num,
-  int k,
+  uint64_t k,
   void* item,
   MPI_Datatype key,
   MPI_Datatype keysat,
@@ -204,7 +204,7 @@ int DTCMP_Selectv_rand(
   int found;
   find_kth_item(scratch, num, k, key, key, cmp, hints, &found, item, comm);
   if (! found) {
-    printf("ERROR: could not find rank=%d @ %s:%d\n", k, __FILE__, __LINE__);
+    printf("ERROR: could not find rank=%llu @ %s:%d\n", k, __FILE__, __LINE__);
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 

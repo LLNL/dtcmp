@@ -206,9 +206,11 @@ algorithm like the following:
 
 TODO:
 Add mechanism to provide assertions in API:
-  all_unique - caller ensures each key is globally unique
+  sorted (locally & globally) - done
+  unique (locally & globally) - done
   stable - caller is requesting that sort is stable
   in_place - caller wants DTCMP to use in-place algorithms
+  deterministic - caller wants deterministic time algorithm
 Routine to return communicator optimized for sorting
 Find way to support variable length keys (e.g., strings)
 Enable apps/libs to create DTCMP_Handles freeable via DTCMP_FREE

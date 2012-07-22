@@ -398,7 +398,7 @@ int DTCMP_Selectv(
                         *       item is to be identified */
   int count,           /* IN  - number of input items on the calling
                         *       process (non-negative integer) */
-  int k,               /* IN  - rank of item to identify in range from
+  uint64_t k,          /* IN  - rank of item to identify in range from
                         *       0 to sum(count)-1 inclusive */
   void* item,          /* OUT - buffer to hold copy of kth largest key */
   MPI_Datatype key,    /* IN  - datatype of key (handle) */

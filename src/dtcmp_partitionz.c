@@ -12,6 +12,10 @@
 #include "mpi.h"
 #include "dtcmp_internal.h"
 
+/* TODO: test cases:
+ *   - fewer items in one segment than ranks
+ *   - multiple segments go to the same ranks */
+
 static int compute_rank_index(
   uint64_t offset, uint64_t num_per_rank, uint64_t num_low_ranks,
   uint64_t* outrank, uint64_t* outindex)
@@ -33,7 +37,11 @@ static int compute_rank_index(
   } else {
     /* our offset falls in the high part of the elements */
     offset -= low_total;
-    rank  = offset / num_per_rank + num_low_ranks;
+    if (num_per_rank > 0) {
+      rank = offset / num_per_rank + num_low_ranks;
+    } else {
+      rank = num_low_ranks;
+    }
     index = offset - (rank - num_low_ranks) * num_per_rank;
   }
 
@@ -44,10 +52,17 @@ static int compute_rank_index(
   return DTCMP_SUCCESS;
 }
 
+/* Given a list of items on each process, globally partition items at
+ * specified item rank, and send smaller items to lower half of ranks
+ * and larger items to upper half of ranks.  Item rank should be in range
+ * of [1,sum(count)].  Lower items go to [0,dividerank-1] and higher
+ * items go to [dividerank,ranks-1].  Evenly divides items among lower
+ * and upper ranges of ranks as best as possible, and returns partitioned
+ * items in newly allocate memory (outbuf, outcount, handle) */
 int DTCMP_Partitionz(
   void* buf,
   int count,
-  int k,
+  uint64_t k,
   int dividerank,
   void** outbuf,
   int* outcount,
@@ -81,10 +96,14 @@ int DTCMP_Partitionz(
   int divide;
   DTCMP_Partition_local_target_dtcpy(buf, count, target, &divide, key, keysat, cmp, hints);
 
-  /* find global offset of our low and high values */
-  uint64_t counts[2], scan_counts[2];
+  /* compute number of items we have for each half,
+   * note that we send the pivot to the upper half */
+  uint64_t counts[2];
   counts[0] = divide;            /* low count */
   counts[1] = count - counts[0]; /* high count */
+
+  /* find global offset of our low and high items */
+  uint64_t scan_counts[2];
   MPI_Exscan(counts, scan_counts, 2, MPI_UINT64_T, MPI_SUM, comm);
   if (rank == 0) {
     scan_counts[0] = 0;
@@ -95,7 +114,9 @@ int DTCMP_Partitionz(
   uint64_t total_counts[2];
   MPI_Allreduce(counts, total_counts, 2, MPI_UINT64_T, MPI_SUM, comm);
 
-  /* determine how many items each low rank will hold */
+  /* determine how many items each low rank will hold,
+   * total in lower half / number of lower ranks, and give one
+   * extra to each initial rank if non-zero remainder */
   uint64_t low_per_rank = 0;
   uint64_t num_low_extras = 0;
   if (dividerank > 0) {

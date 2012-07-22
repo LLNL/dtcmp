@@ -785,7 +785,7 @@ int DTCMP_Select_local(
 int DTCMP_Selectv(
   const void* buf,
   int num,
-  int k,
+  uint64_t k,
   void* item,
   MPI_Datatype key,
   MPI_Datatype keysat,
@@ -831,7 +831,7 @@ int DTCMP_Selectv(
   int ranks;
   MPI_Comm_size(comm, &ranks);
   if (ranks < 2) {
-    return DTCMP_Select_local(buf, num, k, item, key, keysat, cmp, hints);
+    return DTCMP_Select_local(buf, num, (int)k, item, key, keysat, cmp, hints);
   }
 
   /* TODO: add Christian Siebert's median selection, which can be cleanly done

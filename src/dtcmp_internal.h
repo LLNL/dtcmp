@@ -238,7 +238,20 @@ int DTCMP_Partition_local_target_dtcpy(
   void* buf,
   int count,
   const void* target,
-  int* outdivide,
+  int* outindex,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints
+);
+
+int DTCMP_Partition_local_target_list_dtcpy(
+  void* buf,
+  int count,
+  int offset,
+  int num,
+  const void* targets,
+  int indicies[],
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
@@ -325,7 +338,7 @@ int DTCMP_Select_local_randpartition(
 int DTCMP_Selectv_rand(
   const void* buf,
   int num,
-  int k,
+  uint64_t k,
   void* item,
   MPI_Datatype key,
   MPI_Datatype keysat,
@@ -337,7 +350,7 @@ int DTCMP_Selectv_rand(
 int DTCMP_Selectv_medianofmedians(
   const void* buf,
   int num,
-  int k,
+  uint64_t k,
   void* item,
   MPI_Datatype key,
   MPI_Datatype keysat,

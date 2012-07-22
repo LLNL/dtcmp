@@ -16,7 +16,7 @@
 
 #define SIZE (50)
 
-typedef int(*selectv_fn)(const void* inbuf, int size, int kth, void* outbuf, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op op, DTCMP_Flags hints, MPI_Comm comm);
+typedef int(*selectv_fn)(const void* inbuf, int size, uint64_t k, void* outbuf, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op op, DTCMP_Flags hints, MPI_Comm comm);
 typedef int(*sort_local_fn)(const void* inbuf, void* outbuf, int size, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op op, DTCMP_Flags hints);
 typedef int(*sort_fn)(const void* inbuf, void* outbuf, int size, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op op, DTCMP_Flags hints, MPI_Comm comm);
 typedef int(*sortv_fn)(const void* inbuf, void* outbuf, int size, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op op, DTCMP_Flags hints, MPI_Comm comm);
@@ -92,7 +92,7 @@ int test_selectv(
   const char* name,
   const void* inbuf,
   int size,
-  int k,
+  uint64_t k,
   void* outbuf,
   MPI_Datatype key,
   MPI_Datatype keysat,
@@ -117,7 +117,7 @@ int test_selectv(
 
 int test_all_selectv(
   const char* test,
-  int k,
+  uint64_t k,
   void* outbuf,
   const void* inbuf,
   int size,
@@ -338,7 +338,7 @@ int main(int argc, char* argv[])
   DTCMP_Op op;
   DTCMP_Flags hints = DTCMP_FLAG_NONE;
   MPI_Comm comm;
-  int kth;
+  uint64_t kth;
 
 DTCMP_Op series1, series2, series3;
 DTCMP_Op_create_series2(DTCMP_OP_INT_ASCEND, DTCMP_OP_LONG_ASCEND, &series1);
@@ -485,6 +485,14 @@ DTCMP_Handle handle;
   op = DTCMP_OP_INT_ASCEND;
   test_all_sorts(test, inbuf, outbuf, size, key, keysat, op, hints, comm);
 DTCMP_Partitionz(inbuf, size, size*ranks/2+1, ranks/2, &partbuf, &partcount, key, keysat, op, hints, comm, &handle);
+DTCMP_Free(&handle);
+uint64_t splitters[2];
+splitters[0] = (uint64_t) (size * ranks * 1 / 3);
+splitters[1] = (uint64_t) (size * ranks * 2 / 3);
+int divideranks[2];
+divideranks[0] = ranks * 1 / 3;
+divideranks[1] = ranks * 2 / 3;
+DTCMP_Partitionz_list(inbuf, size, 2, splitters, divideranks, &partbuf, &partcount, key, keysat, op, hints, comm, &handle);
 DTCMP_Free(&handle);
   test = "SIZE INT/2INT DESCEND";
   op = DTCMP_OP_INT_DESCEND;

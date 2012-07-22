@@ -24,23 +24,30 @@ static int DTCMP_Sort_local_randquicksort_scratch(
     return DTCMP_SUCCESS;
   }
 
-  /* TODO: if count is small enough, just go with something like insertion sort */
+  /* TODO: if count is small enough, just go with something like
+   * insertion sort */
 
   /* identify pivot value */
 //  int pivot = 0;
   int pivot = rand_r(&dtcmp_rand_seed) % num;
 
   /* parition items in buf around pivot */
-  int index = dtcmp_partition_local_memcpy(buf, scratch, pivot, num, size, cmp, hints);
+  int index = dtcmp_partition_local_memcpy(
+    buf, scratch, pivot, num, size, cmp, hints
+  );
 
   /* sort items less than pivot */
   int lowcount = index;
-  DTCMP_Sort_local_randquicksort_scratch(buf, scratch, lowcount, size, cmp, hints);
+  DTCMP_Sort_local_randquicksort_scratch(
+    buf, scratch, lowcount, size, cmp, hints
+  );
 
   /* sort items larger than pivot */
   int highcount = num - index - 1;
   void* highbuf = (char*)buf + (index + 1) * size;
-  DTCMP_Sort_local_randquicksort_scratch(highbuf, scratch, highcount, size, cmp, hints);
+  DTCMP_Sort_local_randquicksort_scratch(
+    highbuf, scratch, highcount, size, cmp, hints
+  );
 
   return DTCMP_SUCCESS;
 }
@@ -57,6 +64,7 @@ int DTCMP_Sort_local_randquicksort(
 {
   int rc = DTCMP_FAILURE;
 
+  /* get true extent of keysat type */
   MPI_Aint lb, extent;
   MPI_Type_get_true_extent(keysat, &lb, &extent);
 
@@ -66,12 +74,14 @@ int DTCMP_Sort_local_randquicksort(
       DTCMP_Memcpy(outbuf, count, keysat, inbuf, count, keysat);
     }
 
-    /* allocate scratch space */
+    /* allocate scratch space to hold one keysat type */
     void* scratch = dtcmp_malloc(extent, 0, __FILE__, __LINE__);
 
-    /* execute our merge sort */
+    /* execute quicksort */
     size_t size = extent;
-    rc = DTCMP_Sort_local_randquicksort_scratch(outbuf, scratch, count, size, cmp, hints);
+    rc = DTCMP_Sort_local_randquicksort_scratch(
+      outbuf, scratch, count, size, cmp, hints
+    );
 
     /* free scratch space */
     dtcmp_free(&scratch);

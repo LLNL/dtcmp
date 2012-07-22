@@ -29,13 +29,13 @@
  * that have a zero count.  We should avoid calling the compare function
  * for these medians, as the actual value may be garbage, which may crash
  * the comparator function, so we check the count before the median. */
-static int int_with_key_cmp_fn(const void* a, const void* b)
+static int uint64t_with_key_cmp_fn(const void* a, const void* b)
 {
   /* check that the counts for both elements are not zero,
    * if a count is zero, consider that element to be higher
    * (throws zeros to back of list) */
-  int count_a = *(int*) a;
-  int count_b = *(int*) b;
+  uint64_t count_a = *(uint64_t*) a;
+  uint64_t count_b = *(uint64_t*) b;
   if (count_a != 0 && count_b != 0) {
     /* both elements have non-zero counts,
      * so compare the median values to each other */
@@ -61,8 +61,8 @@ static void compute_weighted_median(
   void* scratch,
   MPI_Datatype key,
   DTCMP_Op keycmp,
-  MPI_Datatype type_int_with_key,
-  DTCMP_Op cmp_int_with_key,
+  MPI_Datatype type_uint64t_with_key,
+  DTCMP_Op cmp_uint64t_with_key,
   DTCMP_Flags hints,
   MPI_Comm comm)
 {
@@ -76,13 +76,13 @@ static void compute_weighted_median(
   /* get true extent of key */
   MPI_Aint key_true_lb, key_true_extent;
   MPI_Type_get_true_extent(key, &key_true_lb, &key_true_extent);
-  size_t size_int_with_key = sizeof(int) + key_true_extent;
+  size_t size_uint64t_with_key = sizeof(uint64_t) + key_true_extent;
 
   /* gather medians with counts to rank 0 */
   char* all_num_with_median = (char*)scratch;
   MPI_Gather(
-    (void*)my_num_with_median, 1, type_int_with_key,
-    all_num_with_median, 1, type_int_with_key, 0, comm
+    (void*)my_num_with_median, 1, type_uint64t_with_key,
+    all_num_with_median, 1, type_uint64t_with_key, 0, comm
   );
 
   /* rank 0 determines the median of medians */
@@ -90,36 +90,36 @@ static void compute_weighted_median(
     /* sort by medians value (ensuring that count is non-zero) */
     DTCMP_Sort_local(
       DTCMP_IN_PLACE, all_num_with_median, ranks,
-      type_int_with_key, type_int_with_key, cmp_int_with_key, hints
+      type_uint64t_with_key, type_uint64t_with_key, cmp_uint64t_with_key, hints
     );
 
     /* compute total number of elements */
-    int N = 0;
+    uint64_t N = 0;
     for (i = 0; i < ranks; i++) {
-      int cnt = *(int*) (all_num_with_median + i * size_int_with_key);
+      uint64_t cnt = *(uint64_t*) (all_num_with_median + i * size_uint64t_with_key);
       N += cnt;
     }
 
     /* identify the weighted median */
     i = 0;
-    int before_weight = 0;
-    int half_weight   = N / 2;
+    uint64_t before_weight = 0;
+    uint64_t half_weight   = N / 2;
     char* ptr = all_num_with_median;
-    void* target = (void*) (ptr + sizeof(int));
+    void* target = (void*) (ptr + sizeof(uint64_t));
     while(i < ranks) {
       /* set our target to the current median
        * and initialize our current weight */
-      target = (void*) (ptr + sizeof(int));
-      int current_weight = *(int*) ptr;
+      target = (void*) (ptr + sizeof(uint64_t));
+      uint64_t current_weight = *(uint64_t*) ptr;
       i++;
-      ptr += size_int_with_key;
+      ptr += size_uint64t_with_key;
 
       /* add weights for any elements which equal this current median */
       if (i < ranks) {
         int result;
-        int next_weight = *(int*) ptr;
+        uint64_t next_weight = *(uint64_t*) ptr;
         if (next_weight > 0) {
-          void* next_target = (void*) (ptr + sizeof(int));
+          void* next_target = (void*) (ptr + sizeof(uint64_t));
           result = dtcmp_op_eval(target, next_target, keycmp);
         } else {
           result = 0;
@@ -128,13 +128,13 @@ static void compute_weighted_median(
           /* current item is equal to target, add its weight */
           current_weight += next_weight;
           i++;
-          ptr += size_int_with_key;
+          ptr += size_uint64t_with_key;
 
           /* get weight and comparison result of next item if one exists */
           if (i < ranks) {
-            next_weight = *(int*) ptr;
+            next_weight = *(uint64_t*) ptr;
             if (next_weight > 0) {
-              void* next_target = (void*) (ptr + sizeof(int));
+              void* next_target = (void*) (ptr + sizeof(uint64_t));
               result = dtcmp_op_eval(target, next_target, keycmp);
             } else {
               result = 0;
@@ -145,7 +145,7 @@ static void compute_weighted_median(
 
       /* determine if the weight before and after this value are
        * each less than or equal to half */
-      int after_weight = N - before_weight - current_weight;
+      uint64_t after_weight = N - before_weight - current_weight;
       if (before_weight <= half_weight && after_weight <= half_weight) {
         break;
       }
@@ -157,13 +157,13 @@ static void compute_weighted_median(
 
     /* set total number of active elements,
      * and copy the median to our allgather send buffer */
-    int* num = (int*) out_num_with_median;
+    uint64_t* num = (uint64_t*) out_num_with_median;
     *num = N;
-    memcpy((char*)out_num_with_median + sizeof(int), target, key_true_extent);
+    memcpy((char*)out_num_with_median + sizeof(uint64_t), target, key_true_extent);
   }
 
   /* broadcast medians */
-  MPI_Bcast(out_num_with_median, 1, type_int_with_key, 0, comm);
+  MPI_Bcast(out_num_with_median, 1, type_uint64t_with_key, 0, comm);
 
   return;
 }
@@ -171,7 +171,7 @@ static void compute_weighted_median(
 static int find_kth_item(
   const void* data,
   int n,
-  int k,
+  uint64_t k,
   MPI_Datatype key,
   MPI_Datatype keysat,
   DTCMP_Op cmp,
@@ -193,9 +193,7 @@ static int find_kth_item(
   /* get true extent of key so we can allocate space to copy them into */
   MPI_Aint key_true_lb, key_true_extent;
   MPI_Type_get_true_extent(key, &key_true_lb, &key_true_extent);
-  size_t size_int_with_key = sizeof(int) + key_true_extent;
-
-  /* allocate scratch space */
+  size_t size_uint64t_with_key = sizeof(uint64_t) + key_true_extent;
 
   /* tracks current lowest index of each of active range */
   int index = 0;
@@ -204,29 +202,23 @@ static int find_kth_item(
   int num = n;
 
   /* candidate median for each splitter with count from local rank */
-  char* my_num_with_median = dtcmp_malloc(size_int_with_key, 0, __FILE__, __LINE__); 
+  char* my_num_with_median = dtcmp_malloc(size_uint64t_with_key, 0, __FILE__, __LINE__); 
 
   /* candidate splitters after each median-of-medians round */
-  char* out_num_with_median = dtcmp_malloc(size_int_with_key, 0, __FILE__, __LINE__);
-
-  /* number of items less than and equal to each candidate median */
-  int counts[2];
-
-  /* total number of items less than and equal to each candidate median */
-  int all_counts[2];
+  char* out_num_with_median = dtcmp_malloc(size_uint64t_with_key, 0, __FILE__, __LINE__);
 
   /* scratch space used to compute median-of-medians */
-  void* weighted_median_scratch = dtcmp_malloc(ranks * size_int_with_key, 0, __FILE__, __LINE__);
+  void* weighted_median_scratch = dtcmp_malloc(ranks * size_uint64t_with_key, 0, __FILE__, __LINE__);
 
   /* create new comparison operation to compare count, then key,
    * don't compare key if either count is zero, since key may be garbage */
-  DTCMP_Op cmp_count_nonzero, cmp_int_with_key;
-  DTCMP_Op_create(MPI_INT, int_with_key_cmp_fn, &cmp_count_nonzero);
-  DTCMP_Op_create_series2(cmp_count_nonzero, cmp, &cmp_int_with_key);
+  DTCMP_Op cmp_count_nonzero, cmp_uint64t_with_key;
+  DTCMP_Op_create(MPI_UINT64_T, uint64t_with_key_cmp_fn, &cmp_count_nonzero);
+  DTCMP_Op_create_series2(cmp_count_nonzero, cmp, &cmp_uint64t_with_key);
 
   /* create and commit datatype to represent concatenation of int with key */
-  MPI_Datatype type_int_with_key;
-  dtcmp_type_concat2(MPI_INT, key, &type_int_with_key);
+  MPI_Datatype type_uint64t_with_key;
+  dtcmp_type_concat2(MPI_UINT64_T, key, &type_uint64t_with_key);
 
   /* iterate until we identify the specified rank, or determine that
    * it does not exist */
@@ -234,13 +226,14 @@ static int find_kth_item(
   while (1) {
     /* record number of active elements for this range */
     char* ptr = my_num_with_median;
-    memcpy(ptr, &num, sizeof(int));
+    uint64_t num64 = (uint64_t) num;
+    memcpy(ptr, &num64, sizeof(uint64_t));
     if (num > 0) {
       /* if there is at least one element, copy in median element */
       int median_index = (num / 2) + index;
       if (median_index < n) {
         const void* median = (char*)data + median_index * keysat_extent;
-        DTCMP_Memcpy(ptr + sizeof(int), 1, key, median, 1, key);
+        DTCMP_Memcpy(ptr + sizeof(uint64_t), 1, key, median, 1, key);
       }
     }
 
@@ -248,21 +241,22 @@ static int find_kth_item(
      * of active elements, N */
     compute_weighted_median(
       (const void*)my_num_with_median, (void*)out_num_with_median, weighted_median_scratch,
-      key, cmp, type_int_with_key, cmp_int_with_key, hints, comm
+      key, cmp, type_uint64t_with_key, cmp_uint64t_with_key, hints, comm
     );
 
-    int N = *(int*)out_num_with_median;
+    uint64_t N = *(uint64_t*)out_num_with_median;
     if (k > N) {
       break;
     }
 
     /* if we don't have any active elements, set counts to 0 */
+    uint64_t counts[2];
     if (num == 0) {
       counts[LT] = 0;
       counts[EQ] = 0;
     } else {
       /* get proposed split point */
-      void* target = out_num_with_median + sizeof(int);
+      void* target = out_num_with_median + sizeof(uint64_t);
 
       /* use binary search to determine indicies denoting elements
        * less-than and greater than M */
@@ -271,22 +265,23 @@ static int find_kth_item(
       int flag, lowest, highest;
       DTCMP_Search_low_local(target,  data, start_index, end_index, key, keysat, cmp, hints, &flag, &lowest);
       DTCMP_Search_high_local(target, data, lowest,      end_index, key, keysat, cmp, hints, &flag, &highest);
-      counts[LT] = lowest - start_index;
-      counts[EQ] = (highest + 1) - lowest;
+      counts[LT] = (uint64_t) (lowest - start_index);
+      counts[EQ] = (uint64_t) ((highest + 1) - lowest);
     }
 
     /* now get global counts across all procs */
-    MPI_Allreduce(counts, all_counts, 2, MPI_INT, MPI_SUM, comm);
+    uint64_t all_counts[2];
+    MPI_Allreduce(counts, all_counts, 2, MPI_UINT64_T, MPI_SUM, comm);
 
     /* based on current median, chop down our active range */
     if (k <= all_counts[LT]) {
       /* the target is in the lower portion,
        * exclude all entries equal to or greater than */
-      num = counts[LT];
+      num = (int) counts[LT];
     } else if (k > (all_counts[LT] + all_counts[EQ])){
       /* the target is in the higher portion,
        * exclude all entries equal to or less than */
-      int num_lte = counts[LT] + counts[EQ];
+      int num_lte = (int) (counts[LT] + counts[EQ]);
       index += num_lte;
       num   -= num_lte;
       k = k - (all_counts[LT] + all_counts[EQ]);
@@ -299,14 +294,14 @@ static int find_kth_item(
 
   /* free our comparison ops and type */
   DTCMP_Op_free(&cmp_count_nonzero);
-  DTCMP_Op_free(&cmp_int_with_key);
-  MPI_Type_free(&type_int_with_key);
+  DTCMP_Op_free(&cmp_uint64t_with_key);
+  MPI_Type_free(&type_uint64t_with_key);
 
   /* determine whether we found the specified rank,
    * and copy its key into the output buffer */
   *found_flag = found_exact;
   if (found_exact != 0) {
-    DTCMP_Memcpy(found_key, 1, key, out_num_with_median + sizeof(int), 1, key);
+    DTCMP_Memcpy(found_key, 1, key, out_num_with_median + sizeof(uint64_t), 1, key);
   }
 
   /* free off our scratch space */
@@ -320,7 +315,7 @@ static int find_kth_item(
 int DTCMP_Selectv_medianofmedians(
   const void* buf,
   int num,
-  int k,
+  uint64_t k,
   void* item,
   MPI_Datatype key,
   MPI_Datatype keysat,
@@ -356,12 +351,13 @@ int DTCMP_Selectv_medianofmedians(
 
   /* sort keys locally */
   DTCMP_Sort_local(DTCMP_IN_PLACE, scratch, num, key, key, cmp, hints);
+  hints |= DTCMP_FLAG_SORTED_LOCAL;
 
   /* find and copy target rank into item */
   int found;
   find_kth_item(scratch, num, k, key, key, cmp, hints, &found, item, comm);
   if (! found) {
-    printf("ERROR: could not find rank=%d @ %s:%d\n", k, __FILE__, __LINE__);
+    printf("ERROR: could not find rank=%llu @ %s:%d\n", k, __FILE__, __LINE__);
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 

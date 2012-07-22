@@ -24,7 +24,8 @@ int DTCMP_Search_low_local_binary(
   /* assume that we won't find the target */
   *flag = 0;
 
-  /* get size of an element so we can increase our pointer by the correct amount */
+  /* get size of an element so we can increase our pointer by the
+   * correct amount */
   MPI_Aint lb, extent;
   MPI_Type_get_extent(keysat, &lb, &extent);
 
@@ -41,7 +42,8 @@ int DTCMP_Search_low_local_binary(
       high = mid;
       if (low == high) {
         /* if the low is also the same as the high we're done,
-         * otherwise we keep looking in case we find a match that is lower */
+         * otherwise we keep looking in case we find a match that is
+         * lower */
         break;
       }
     } else if (result < 0) {
@@ -58,8 +60,9 @@ int DTCMP_Search_low_local_binary(
   /* set index to the lowest index where target
    * could be inserted into list and still be in order */
   if (*flag) {
-    /* set index to high, which will be lowest index where target can be inserted
-     * so it is in order (and first in the list if there are duplicates) */
+    /* set index to high, which will be lowest index where target can
+     * be inserted so it is in order (and first in the list if there
+     * are duplicates) */
     *index = high;
   } else {
     /* if we didn't find it, we need to increment the high index by one */
@@ -84,7 +87,8 @@ int DTCMP_Search_high_local_binary(
   /* assume that we won't find the target */
   *flag = 0;
 
-  /* get size of an element so we can increase our pointer by the correct amount */
+  /* get size of an element so we can increase our pointer by the
+   * correct amount */
   MPI_Aint lb, extent;
   MPI_Type_get_extent(keysat, &lb, &extent);
 
@@ -101,7 +105,8 @@ int DTCMP_Search_high_local_binary(
       low = mid;
       if (low == high) {
         /* if the low is also the same as the high we're done,
-         * otherwise we keep looking in case we find a match that is higher */
+         * otherwise we keep looking in case we find a match that is
+         * higher */
         break;
       }
     } else if (result < 0) {
@@ -118,8 +123,9 @@ int DTCMP_Search_high_local_binary(
   /* set index to the highest index after which the target
    * could be inserted into list and still be in order */
   if (*flag) {
-    /* set index to low, which will be highest index after which the target can be inserted
-     * so it is in order (and last in the list if there are duplicates) */
+    /* set index to low, which will be highest index after which the
+     * target can be inserted so it is in order (and last in the list
+     * if there are duplicates) */
     *index = low;
   } else {
     /* if we didn't find it, we need to decrement the low index by one */
@@ -129,7 +135,8 @@ int DTCMP_Search_high_local_binary(
   return DTCMP_SUCCESS;
 }
 
-/* calls DTCMP_Search_low for an ordered list of targets and returns each corresponding index */
+/* calls DTCMP_Search_low for an ordered list of targets and returns
+ * each corresponding index */
 int DTCMP_Search_low_list_local_binary(
   int num,
   const void* targets,
@@ -143,7 +150,8 @@ int DTCMP_Search_low_list_local_binary(
   int flags[],
   int indicies[])
 {
-  /* get size of an element so we can increase our pointer by the correct amount */
+  /* get size of an element so we can increase our pointer by the
+   * correct amount */
   MPI_Aint target_lb, target_extent;
   MPI_Type_get_extent(key, &target_lb, &target_extent);
 
@@ -151,18 +159,24 @@ int DTCMP_Search_low_list_local_binary(
   int flag, index;
   int mid = num / 2;
   const void* target = (char*)targets + mid * target_extent;
-  DTCMP_Search_low_local_binary(target, list, low, high, key, keysat, cmp, hints, &flag, &index);
+  DTCMP_Search_low_local_binary(
+    target, list, low, high,
+    key, keysat, cmp, hints, &flag, &index
+  );
   flags[mid] = flag;
   indicies[mid] = index;
 
-  /* use this index as a split point to recursively search each half for remaining targets */
+  /* use this index as a split point to recursively search each half
+   * for remaining targets */
   if (index > high) {
     /* if the target is bigger than any item in the list,
-     * the index returned from the lowest search will be one more than we have in our list */
+     * the index returned from the lowest search will be one more than
+     * we have in our list */
     index = high;
   }
 
-  /* recursively search the bottom half of our list for the bottom half of the remaining targets */
+  /* recursively search the bottom half of our list for the bottom half
+   * of the remaining targets */
   if (mid > 0) {
     DTCMP_Search_low_list_local_binary(
       mid, targets, list, low, index,
@@ -170,15 +184,17 @@ int DTCMP_Search_low_list_local_binary(
     );
   }
 
-  /* recursively search the top half of our list for the top half of the remaining targets */
+  /* recursively search the top half of our list for the top half of
+   * the remaining targets */
   int upper_index = mid + 1;
   int upper_count = num - upper_index;
+  char* upper_targets = (char*)targets + upper_index * target_extent;
   if (upper_count > 0) {
     DTCMP_Search_low_list_local_binary(
-      upper_count, (char*)targets + upper_index * target_extent, list, index, high,
+      upper_count, upper_targets, list, index, high,
       key, keysat, cmp, hints, flags + upper_index, indicies + upper_index
     );
   }
   
-  return 0;
+  return DTCMP_SUCCESS;
 }
