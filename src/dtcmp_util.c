@@ -412,3 +412,105 @@ int dtcmp_weighted_median(
 
   return DTCMP_SUCCESS;
 }
+
+/* distribute a sorted set of elements acquired from a sortz back to
+ * ranks requiring a sort */
+int dtcmp_sortz_to_sort(
+  const void* inbuf,
+  int incount,
+  void* outbuf,
+  int outcount,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Comm comm)
+{
+  int i;
+
+  /* nothing to do if our outcount is zero */
+  if (outcount == 0) {
+    return DTCMP_SUCCESS;
+  }
+
+  /* get our rank and the number of ranks in comm */
+  int rank, ranks;
+  MPI_Comm_rank(comm, &rank);
+  MPI_Comm_size(comm, &ranks);
+
+  /* determine the starting offset of our elements */
+  uint64_t scancount;
+  uint64_t count = (uint64_t) incount;
+  MPI_Exscan(&count, &scancount, 1, MPI_UINT64_T, MPI_SUM, comm);
+  if (rank == 0) {
+    scancount = 0;
+  }
+
+  /* indentify ranks and indicies to send our values */
+  uint64_t items_per_rank = (uint64_t) outcount;
+  uint64_t start_rank  = scancount / items_per_rank;
+  uint64_t start_index = scancount - start_rank * items_per_rank;
+  uint64_t end_rank    = (scancount + count) / items_per_rank;
+  uint64_t end_index   = (scancount + count) - end_rank * items_per_rank;
+
+  /* allocate space for our alltoallv */
+  int* sendcounts = (int*) dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* senddispls = (int*) dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* recvcounts = (int*) dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* recvdispls = (int*) dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
+
+  /* initialize all send counts to 0 */
+  for (i = 0; i < ranks; i++) {
+    sendcounts[i] = 0;
+    senddispls[i] = 0;
+  }
+
+  /* fill in non-zero send counts and displacements */
+  int senddisp = 0;
+  for (i = start_rank; i <= end_rank; i++) {
+    /* determine start index on destination rank */
+    int start = 0;
+    if (i == (int) start_rank) {
+      start = (int) start_index;
+    }
+
+    /* determine end index on destination rank */
+    int end = (int) outcount;
+    if (i == (int) end_rank) {
+      end = (int) end_index;
+    }
+
+    /* fill in our send counts */
+    int sendcount = end - start;
+    if (i < ranks) {
+      sendcounts[i] = sendcount;
+      senddispls[i] = senddisp;
+    }
+    senddisp += sendcount;
+  }
+
+  /* alltoall to get recv counts */
+  MPI_Alltoall(sendcounts, 1, MPI_INT, recvcounts, 1, MPI_INT, comm);
+
+  /* compute recv displacements from counts */
+  int recvdisp = 0;
+  for (i = 0; i < ranks; i++) {
+    recvdispls[i] = recvdisp;
+    recvdisp += recvcounts[i];
+  }
+
+  /* alltoallv to exchange data */
+  MPI_Alltoallv(
+    (void*)inbuf,  sendcounts, senddispls, keysat,
+    outbuf, recvcounts, recvdispls, keysat,
+    comm
+  );
+
+  /* free memory */
+  dtcmp_free(&recvdispls);
+  dtcmp_free(&recvcounts);
+  dtcmp_free(&senddispls);
+  dtcmp_free(&sendcounts);
+
+  return DTCMP_SUCCESS;
+}

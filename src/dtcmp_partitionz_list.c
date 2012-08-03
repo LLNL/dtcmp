@@ -7,6 +7,7 @@
  * For details, see https://github.com/hpc/dtcmp
  * Please also read this file: LICENSE.TXT. */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "mpi.h"

@@ -97,7 +97,15 @@ int dtcmp_get_randroot(int count, int* flag, int* root, MPI_Comm comm);
 /* randomly choose element from all tasks as bcast element,
  * a weight of 0 disqualifies a process from contributing,
  * flag is set to 1 if output buffer is valid, 0 otherwise */
-int dtcmp_randbcast(const void* inbuf, int weight, void* outbuf, int* flag, int count, MPI_Datatype type, MPI_Comm comm);
+int dtcmp_randbcast(
+  const void* inbuf,
+  int weight,
+  void* outbuf,
+  int* flag,
+  int count,
+  MPI_Datatype type,
+  MPI_Comm comm
+);
 
 int dtcmp_get_lt_eq_gt(
   const void* target,
@@ -119,6 +127,20 @@ int dtcmp_type_concat(int num, const MPI_Datatype oldtypes[], MPI_Datatype* newt
 
 /* same as above but a shortcut when using just two input types */
 int dtcmp_type_concat2(MPI_Datatype type1, MPI_Datatype type2, MPI_Datatype* newtype);
+
+/* distribute a sorted set of elements acquired from a sortz back to
+ * ranks requiring a sort */
+int dtcmp_sortz_to_sort(
+  const void* inbuf,
+  int incount,
+  void* outbuf,
+  int outcount,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Comm comm
+);
 
 /* ---------------------------------------
  * Uniqify functions - ensure every element is unique for stable sorts
@@ -419,6 +441,17 @@ int DTCMP_Sort_allgather(
 );
 
 int DTCMP_Sort_bitonic(
+  const void* inbuf,
+  void* outbuf,
+  int count,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Comm comm
+);
+
+int DTCMP_Sort_samplesort(
   const void* inbuf,
   void* outbuf,
   int count,

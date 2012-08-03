@@ -94,6 +94,15 @@ DTCMP_Op DTCMP_OP_DOUBLE_DESCEND = NULL;
 DTCMP_Op DTCMP_OP_LONGDOUBLE_ASCEND  = NULL;
 DTCMP_Op DTCMP_OP_LONGDOUBLE_DESCEND = NULL;
 
+/* TODO: determine these values dynamically and/or allow user to
+ * configure them */
+
+/* thresholds to switch to different sort algorithms */
+uint64_t DTCMP_SORT_LOCAL_THRESHOLD_INSERTION = 20;
+uint64_t DTCMP_SORT_THRESHOLD_ALLGATHER = 1024;
+uint64_t DTCMP_SORT_THRESHOLD_BITONIC   = 20;
+uint64_t DTCMP_SORTV_THRESHOLD_ALLGATHER = 1024;
+
 /* determine whether type is contiguous, has a true lower bound of 0,
  * and extent == true_extent */
 static int dtcmp_type_is_valid(MPI_Datatype type)
@@ -866,17 +875,33 @@ int DTCMP_Sort_local(
     return DTCMP_FAILURE;
   }
 
-  /* TODO: select algorithm based on number of elements */
+  /* select algorithm based on number of elements */
 
-  return DTCMP_Sort_local_mergesort(inbuf, outbuf, count, key, keysat, cmp, hints);
-  return DTCMP_Sort_local_insertionsort(inbuf, outbuf, count, key, keysat, cmp, hints);
-  return DTCMP_Sort_local_randquicksort(inbuf, outbuf, count, key, keysat, cmp, hints);
+  /* nothing to do with one or fewer elements (already sorted) */
+  if (count < 2) {
+    return DTCMP_SUCCESS;
+  }
 
+  /* pick algorithm based on number of elements */
+  if (count <= DTCMP_SORT_LOCAL_THRESHOLD_INSERTION) {
+    /* for a small number of elements, insertion sort is fastest */
+    return DTCMP_Sort_local_insertionsort(inbuf, outbuf, count, key, keysat, cmp, hints);
+  } else {
+    /* otherwise, use merge sort */
+    return DTCMP_Sort_local_mergesort(inbuf, outbuf, count, key, keysat, cmp, hints);
+
+    /* randomized quicksort may be faster than mergesort, but it could
+     * be worse with lots of processes since its time is variable */
+    return DTCMP_Sort_local_randquicksort(inbuf, outbuf, count, key, keysat, cmp, hints);
+  }
+
+#if 0
   /* if keysat is valid type and if function is basic, we can just call qsort */
   dtcmp_op_handle_t* c = (dtcmp_op_handle_t*) cmp;
   if (c->type == DTCMP_OP_TYPE_BASIC) {
     return DTCMP_Sort_local_qsort(inbuf, outbuf, count, key, keysat, cmp, hints);
   }
+#endif
 }
 
 int DTCMP_Sort(
@@ -920,9 +945,22 @@ int DTCMP_Sort(
     return DTCMP_SUCCESS;
   }
 
-  /* TODO: pick algorithm based on number of items */
-
-  return DTCMP_Sort_allgather(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
+  /* pick algorithm based on number of items */
+  if (sum <= DTCMP_SORT_THRESHOLD_ALLGATHER) {
+    /* if we have a small number of elements, it's fastest to do an
+     * allgather and a local sort at each process */
+    return DTCMP_Sort_allgather(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
+  } else {
+    if (count <= DTCMP_SORT_THRESHOLD_BITONIC) {
+      /* for a small number of elements per process but lots of
+       * processes, bitonic sort works best (use count here not
+       * the sum) */
+      return DTCMP_Sort_bitonic(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
+    } else {
+      /* otherwise use sample sort which is good for lots of elements */
+      return DTCMP_Sort_samplesort(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
+    }
+  }
 }
 
 int DTCMP_Sortv(
@@ -971,11 +1009,15 @@ int DTCMP_Sortv(
     return DTCMP_Sort(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
   }
 
-  /* if sum(counts) is small gather to one task */
-
-  /* if we have any elements, invoke the sortv routines */
-  return DTCMP_Sortv_sortgather_scatter(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
-  return DTCMP_Sortv_allgather(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
+  /* pick algorithm based on number of elements */
+  if (sum <= DTCMP_SORTV_THRESHOLD_ALLGATHER) {
+    /* if sum is small gather to each task and sort locally */
+    return DTCMP_Sortv_allgather(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
+  } else {
+    /* TODO: call samplesort */
+    return DTCMP_Sortv_cheng(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
+    return DTCMP_Sortv_sortgather_scatter(inbuf, outbuf, count, key, keysat, cmp, hints, comm);
+  }
 }
 
 int DTCMP_Sortz(

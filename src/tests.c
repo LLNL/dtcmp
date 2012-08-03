@@ -50,16 +50,18 @@ char* sort_local_names[NUM_SORT_LOCAL_FNS] = {
   "DTCMP_Sort_local_qsort",
 };
 
-#define NUM_SORT_FNS (3)
+#define NUM_SORT_FNS (4)
 sort_fn sort_fns[NUM_SORT_FNS] = {
   DTCMP_Sort,
-  DTCMP_Sort_bitonic,
   DTCMP_Sort_allgather,
+  DTCMP_Sort_bitonic,
+  DTCMP_Sort_samplesort,
 };
 char* sort_names[NUM_SORT_FNS] = {
   "DTCMP_Sort",
-  "DTCMP_Sort_bitonic",
   "DTCMP_Sort_allgather",
+  "DTCMP_Sort_bitonic",
+  "DTCMP_Sort_samplesort",
 };
 
 #define NUM_SORTV_FNS (4)
