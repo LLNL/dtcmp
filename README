@@ -215,3 +215,11 @@ Routine to return communicator optimized for sorting
 Find way to support variable length keys (e.g., strings)
 Enable apps/libs to create DTCMP_Handles freeable via DTCMP_FREE
   DTCMP_Handle_create(fn* my_delete, void* my_arg, DTCMP_Handle* out)
+
+BUILD:
+First build and install the LWGRP library, available here:
+http://github.com/hpc/lwgrp
+
+./configure --prefix <installdir> --with-lwgrp=<lwgrp_installdir>
+make
+make install
