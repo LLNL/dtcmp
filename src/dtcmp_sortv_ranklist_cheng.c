@@ -12,7 +12,7 @@
 #include <string.h>
 #include "mpi.h"
 #include "dtcmp_internal.h"
-#include "ranklist_internal.h"
+#include "lwgrp.h"
 
 /* This implementation is based on ideas from:
  *
@@ -75,7 +75,8 @@ static void compute_weighted_median(
   DTCMP_Flags hints,
   int group_rank,
   int group_ranks,
-  const int* comm_ranklist,
+  const lwgrp_ring* ring,
+  const lwgrp_logring* logring,
   MPI_Comm comm)
 {
   int i;
@@ -90,9 +91,9 @@ static void compute_weighted_median(
   char* all_num_with_median = (char*)scratch + size_int_with_key;
 
   /* scatter weights and medians to different ranks */
-  ranklist_alltoall_brucks(
+  lwgrp_logring_alltoall_brucks(
     my_num_with_median, all_num_with_median, 1, type_int_with_key,
-    group_rank, group_ranks, comm_ranklist, comm
+    ring, logring
   );
 
   /* sort by medians value (ensuring that count is non-zero) */
@@ -170,9 +171,9 @@ static void compute_weighted_median(
   memcpy(num_with_median + sizeof(int), target, key_true_extent);
 
   /* broadcast medians */
-  ranklist_allgather_brucks(
+  lwgrp_logring_allgather_brucks(
     num_with_median, out_num_with_median, 1, type_int_with_key,
-    group_rank, group_ranks, comm_ranklist, comm
+    ring, logring
   );
 
   return;
@@ -190,7 +191,8 @@ static int find_exact_splitters(
   int splitters_valid[],
   int group_rank,
   int group_ranks,
-  const int* comm_ranklist,
+  const lwgrp_ring* ring,
+  const lwgrp_logring* logring,
   MPI_Comm comm)
 {
   int i;
@@ -250,10 +252,7 @@ static int find_exact_splitters(
 
   /* gather number of elements each process is contributing
    * (borrow the index array for this task) */
-  ranklist_allgather_brucks(
-    &n, index, 1, MPI_INT,
-    group_rank, group_ranks, comm_ranklist, comm
-  );
+  lwgrp_logring_allgather_brucks(&n, index, 1, MPI_INT, ring, logring);
 
   /* compute ranks of split points (start from 1) */
   int count = 1;
@@ -304,7 +303,7 @@ static int find_exact_splitters(
     compute_weighted_median(
       (const void*)my_num_with_median, (void*)out_num_with_median, weighted_median_scratch,
       key, cmp, type_int_with_key, cmp_int_with_key, hints,
-      group_rank, group_ranks, comm_ranklist, comm
+      group_rank, group_ranks, ring, logring, comm
     );
 
     /* stop if for each range, N is below threshold or if we found
@@ -354,9 +353,9 @@ static int find_exact_splitters(
     }
 
     /* now get global counts across all procs */
-    ranklist_allreduce_recursive(
+    lwgrp_logring_allreduce(
       counts, all_counts, 2 * group_ranks, MPI_INT, MPI_SUM,
-      group_rank, group_ranks, comm_ranklist, comm
+      ring, logring
     );
 
     /* based on rank of splitter, chop down our active range */
@@ -424,9 +423,9 @@ static int find_exact_splitters(
     }
 
     /* inform each rank how many elements we will be sending in alltoallv */
-    ranklist_alltoall_brucks(
+    lwgrp_logring_alltoall_brucks(
       sendcounts, recvcounts, 1, MPI_INT,
-      group_rank, group_ranks, comm_ranklist, comm
+      ring, logring
     );
 
     /* build our displacement arrays for alltoallv call */
@@ -529,7 +528,8 @@ static int exact_split_exchange_merge(
   int splitters_valid[],
   int group_rank,
   int group_ranks,
-  const int comm_ranklist[],
+  const lwgrp_ring* ring,
+  const lwgrp_logring* logring,
   MPI_Comm comm)
 {
   int i;
@@ -618,9 +618,9 @@ static int exact_split_exchange_merge(
   int* recvcounts = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* inform other processes how many elements we'll be sending to each */
-  ranklist_alltoall_brucks(
+  lwgrp_logring_alltoall_brucks(
     sendcounts, recvcounts, 1, MPI_INT,
-    group_rank, group_ranks, comm_ranklist, comm
+    ring, logring
   );
 
   /* displacement for each of our send ranges */
@@ -651,10 +651,10 @@ static int exact_split_exchange_merge(
 
   /* exchange data */
   char* recvdata = kbuf;
-  ranklist_alltoallv_linear(
+  lwgrp_logring_alltoallv_linear(
     outbuf, sendcounts, senddispls,
     recvdata, recvcounts, recvdispls,
-    keysat, group_rank, group_ranks, comm_ranklist, comm
+    keysat, ring, logring
   );
 
   /* pointer to set of items we receive from each proc */
@@ -708,6 +708,12 @@ int DTCMP_Sortv_ranklist_cheng(
    * 3) identify split points in local data
    * 4) send data to final process with alltoall/alltoallv
    * 5) merge data into final sorted order */
+
+  /* create ring and logring from our ranklist */
+  lwgrp_ring ring;
+  lwgrp_logring logring;
+  lwgrp_ring_build_from_list(comm, group_ranks, comm_ranklist, &ring);
+  lwgrp_logring_build_from_list(comm, group_ranks, comm_ranklist, &logring);
 
   /* TODO: incorporate scans to avoid this requirement */
   /* ensure all elements are unique */
@@ -764,14 +770,14 @@ int DTCMP_Sortv_ranklist_cheng(
   find_exact_splitters(
     uniqbuf, count, uniqkey, uniqkeysat, uniqcmp, uniqhints,
     THRESH, splitters, valid,
-    group_rank, group_ranks, comm_ranklist, comm
+    group_rank, group_ranks, &ring, &logring, comm
   );
 
   /* now split data, exchange, and merge */
   exact_split_exchange_merge(
     uniqbuf, count, uniqkey, uniqkeysat, uniqcmp, uniqhints,
     splitters, valid,
-    group_rank, group_ranks, comm_ranklist, comm
+    group_rank, group_ranks, &ring, &logring, comm
   );
 
   /* strip off extra data we attached to ensure items are unique */
@@ -782,6 +788,10 @@ int DTCMP_Sortv_ranklist_cheng(
   /* free our scratch space */
   dtcmp_free(&valid);
   dtcmp_free(&splitters);
+
+  /* free our ring and logring objects */
+  lwgrp_logring_free(&logring);
+  lwgrp_ring_free(&ring);
 
   return 0;
 }
