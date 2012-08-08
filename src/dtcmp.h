@@ -52,7 +52,7 @@ extern const void* DTCMP_IN_PLACE;
  * easy to search and replace in case we want to change it,
  * may want to do this via MPI_Info-like object or other
  * functions */
-typedef int DTCMP_Flags;
+typedef uint32_t DTCMP_Flags;
 
 #define DTCMP_FLAG_NONE   (0x0) /* no hints/assertions provided */
 #define DTCMP_FLAG_UNIQUE_LOCAL (0x1)  /* elems known to be locally unique */
@@ -350,6 +350,45 @@ int DTCMP_Partition_local(
   DTCMP_Flags hints    /* IN  - hints/assertions (bit flags) */
 );
 
+/* TODO: add partition_list functions like search list */
+
+/* TODO: add partition_target functions like search list */
+
+#if 0
+/* TODO: change comm to lwgrp, since common use will be to recursively
+ * divide comm into smaller groups as part of sort */
+
+/* Given a list of items on each process, globally partition items at
+ * specified item rank, and send smaller items to lower half of ranks
+ * and larger items to upper half of ranks.  Item rank should be in
+ * range of [1,sum(count)].  Lower items go to [0,dividerank-1] and
+ * higher items go to [dividerank,ranks-1].  Evenly divides items among
+ * lower and upper ranges of ranks as best as possible, and returns
+ * partitioned items in newly allocate memory (outbuf, outcount, handle) */
+int DTCMP_Partitionz(
+  const void* buf,     /* IN  - buffer holding elements to be
+                        *       partitioned */
+  int count,           /* IN  - number of input items on the calling
+                        *       process (non-negative integer) */
+  uint64_t k,          /* IN  - rank of item to identify in range from
+                        *       0 to sum(count)-1 inclusive */
+  int dividerank,      /* IN  - lowest MPI rank to receive elements
+                        *       ranked at k or higher */
+  void** outbuf,       /* OUT - start of buffer to hold output
+                        *       key/satellite items after partition */
+  int* outcount,       /* OUT - number of items in output buffer
+                        *       (non-negative integer) */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison function (handle) */
+  DTCMP_Flags hints    /* IN  - hints/assertions (bit flags) */
+  MPI_Comm comm,       /* IN  - communicator on which to execute
+                        *       partition (handle) */
+  DTCMP_Handle* handle /* OUT - handle to resources associated with
+                        *       outbuf (handle) */
+);
+#endif
+
 /* ----------------------------------------------
  * Merge functions
  * ---------------------------------------------- */
@@ -519,51 +558,143 @@ int DTCMP_Is_sorted(
  * group_ranks[i]-1 and it specifies the item's rank within its group,
  * with any ties broken first by MPI rank and then by the item's index
  * within buf */
+int DTCMP_Rank_local(
+  int count,              /* IN  - number of input items on the calling
+                           *       process (non-negative integer) */
+  const void* buf,        /* IN  - start of buffer containing input
+                           *       key/satellite items */
+  uint64_t* groups,       /* OUT - number of distinct items
+                           *       (non-negative integer) */
+  uint64_t group_id[],    /* OUT - group identifier corresponding to
+                           *       each input item (array of
+                           *       non-negative integer of length count) */
+  uint64_t group_ranks[], /* OUT - number of items within group of
+                           *       each input item (array of
+                           *       non-negative integers of length count) */
+  uint64_t group_rank[],  /* OUT - rank of each input item within its
+                           *       group (array of non-negative
+                           *       integers of length count) */
+  MPI_Datatype key,       /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat,    /* IN  - datatype of key and satellite (handle) */
+  DTCMP_Op cmp,           /* IN  - key comparison operation (handle) */
+  DTCMP_Flags hints       /* IN  - hints/assertions (bit flags) */
+);
+
+/* conveniece function to rank variable length, NUL-terminated C
+ * strings */
+int DTCMP_Rank_strings_local(
+  int count,              /* IN  - number of strings on calling
+                           *       process (non-negative integer) */
+  const char* strings[],  /* IN  - array of pointers to each string
+                           *       (array of length count) */
+  uint64_t* groups,       /* OUT - number of distinct strings
+                           *       (non-negative integer) */
+  uint64_t group_id[],    /* OUT - group identifier corresponding to
+                           *       each input item (array of
+                           *       non-negative integer of length count) */
+  uint64_t group_ranks[], /* OUT - number of items within group of
+                           *       each input item (array of
+                           *       non-negative integers of length count) */
+  uint64_t group_rank[],  /* OUT - rank of each input item within its
+                           *       group (array of non-negative
+                           *       integers of length count) */
+  DTCMP_Flags hints       /* IN  - hints/assertions (bit flags) */
+);
+
+int DTCMP_Rank(
+  int count,              /* IN  - number of input items on the calling
+                           *       process (non-negative integer) */
+  const void* buf,        /* IN  - start of buffer containing input
+                           *       key/satellite items */
+  uint64_t* groups,       /* OUT - number of distinct items
+                           *       (non-negative integer) */
+  uint64_t  group_id[],   /* OUT - group identifier corresponding to
+                           *       each input item (array of
+                           *       non-negative integer of length count) */
+  uint64_t  group_ranks[],/* OUT - number of items within group of
+                           *       each input item (array of
+                           *       non-negative integers of length count) */
+  uint64_t  group_rank[], /* OUT - rank of each input item within its
+                           *       group (array of non-negative
+                           *       integers of length count) */
+  MPI_Datatype key,       /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat,    /* IN  - datatype of key and satellite (handle) */
+  DTCMP_Op cmp,           /* IN  - key comparison operation (handle) */
+  DTCMP_Flags hints,      /* IN  - hints/assertions (bit flags) */
+  MPI_Comm comm           /* IN  - communicator on which to execute
+                           *       rank (handle) */
+);
+
+/* conveniece function to rank variable length, NUL-terminated C
+ * strings */
+int DTCMP_Rank_strings(
+  int count,              /* IN  - number of strings on calling
+                           *       process (non-negative integer) */
+  const char* strings[],  /* IN  - array of pointers to each string
+                           *       (array of length count) */
+  uint64_t* groups,       /* OUT - number of distinct strings
+                           *       (non-negative integer) */
+  uint64_t group_id[],    /* OUT - group identifier corresponding to
+                           *       each input item (array of
+                           *       non-negative integer of length count) */
+  uint64_t group_ranks[], /* OUT - number of items within group of
+                           *       each input item (array of
+                           *       non-negative integers of length count) */
+  uint64_t group_rank[],  /* OUT - rank of each input item within its
+                           *       group (array of non-negative
+                           *       integers of length count) */
+  DTCMP_Flags hints,      /* IN  - hints/assertions (bit flags) */
+  MPI_Comm comm           /* IN  - communicator on which to execute
+                           *       rank (handle) */
+);
+
+/* like DTCMP_Rank but each process can contribute different number of
+ * elements */
 int DTCMP_Rankv(
-  int count,           /* IN  - number of input items on the calling
-                        *       process (non-negative integer) */
-  const void* buf,     /* IN  - start of buffer containing input
-                        *       key/satellite items */
-  uint64_t* groups,         /* OUT - number of distinct items
-                        *       (non-negative integer) */
-  uint64_t  group_id[],     /* OUT - group identifier corresponding to
-                        *       each input item (array of
-                        *       non-negative integer of length count) */
-  uint64_t  group_ranks[],  /* OUT - number of items within group of
-                        *       each input item (array of
-                        *       non-negative integers of length count) */
-  uint64_t  group_rank[],   /* OUT - rank of each input item within its
-                        *       group (array of non-negative
-                        *       integers of length count) */
-  MPI_Datatype key,    /* IN  - datatype of key (handle) */
-  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
-  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
-  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
-  MPI_Comm comm        /* IN  - communicator on which to execute
-                        *       rank (handle) */
+  int count,              /* IN  - number of input items on the calling
+                           *       process (non-negative integer) */
+  const void* buf,        /* IN  - start of buffer containing input
+                           *       key/satellite items */
+  uint64_t* groups,       /* OUT - number of distinct items
+                           *       (non-negative integer) */
+  uint64_t group_id[],    /* OUT - group identifier corresponding to
+                           *       each input item (array of
+                           *       non-negative integer of length count) */
+  uint64_t group_ranks[], /* OUT - number of items within group of
+                           *       each input item (array of
+                           *       non-negative integers of length count) */
+  uint64_t group_rank[],  /* OUT - rank of each input item within its
+                           *       group (array of non-negative
+                           *       integers of length count) */
+  MPI_Datatype key,       /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat,    /* IN  - datatype of key and satellite (handle) */
+  DTCMP_Op cmp,           /* IN  - key comparison operation (handle) */
+  DTCMP_Flags hints,      /* IN  - hints/assertions (bit flags) */
+  MPI_Comm comm           /* IN  - communicator on which to execute
+                           *       rank (handle) */
 );
 
 /* conveniece function to rank variable length, NUL-terminated C
  * strings */
 int DTCMP_Rankv_strings(
-  int count,             /* IN  - number of strings on calling
-                          *       process (non-negative integer) */
-  const char* strings[], /* IN  - array of pointers to each string
-                          *       (array of length count) */
-  uint64_t* groups,           /* OUT - number of distinct strings
-                          *       (non-negative integer) */
-  uint64_t group_id[],        /* OUT - group identifier corresponding to
-                          *       each input item (array of
-                          *       non-negative integer of length count) */
-  uint64_t group_ranks[],     /* OUT - number of items within group of
-                          *       each input item (array of
-                          *       non-negative integers of length count) */
-  uint64_t group_rank[],      /* OUT - rank of each input item within its
-                          *       group (array of non-negative
-                          *       integers of length count) */
-  DTCMP_Flags hints,     /* IN  - hints/assertions (bit flags) */
-  MPI_Comm comm          /* IN  - communicator on which to execute
-                          *       rank (handle) */
+  int count,              /* IN  - number of strings on calling
+                           *       process (non-negative integer) */
+  const char* strings[],  /* IN  - array of pointers to each string
+                           *       (array of length count) */
+  uint64_t* groups,       /* OUT - number of distinct strings
+                           *       (non-negative integer) */
+  uint64_t group_id[],    /* OUT - group identifier corresponding to
+                           *       each input item (array of
+                           *       non-negative integer of length count) */
+  uint64_t group_ranks[], /* OUT - number of items within group of
+                           *       each input item (array of
+                           *       non-negative integers of length count) */
+  uint64_t group_rank[],  /* OUT - rank of each input item within its
+                           *       group (array of non-negative
+                           *       integers of length count) */
+  DTCMP_Flags hints,      /* IN  - hints/assertions (bit flags) */
+  MPI_Comm comm           /* IN  - communicator on which to execute
+                           *       rank (handle) */
 );
 
 #ifdef __cplusplus

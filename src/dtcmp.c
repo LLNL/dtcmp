@@ -935,10 +935,8 @@ int DTCMP_Sort(
     return DTCMP_Sort_local(inbuf, outbuf, count, key, keysat, cmp, hints);
   }
 
-  /* execute allreduce to compute min/max counts per process,
-   * and sum of all elements */ 
-  uint64_t min, max, sum;
-  dtcmp_get_uint64t_min_max_sum(count, &min, &max, &sum, comm);
+  /* determine the total number of elements across all procs */
+  uint64_t sum = count * ranks;
 
   /* nothing to do if the total element count is 0 */
   if (sum == 0) {
@@ -1076,6 +1074,84 @@ int DTCMP_Sortz(
   return DTCMP_FAILURE;
 }
 
+int DTCMP_Rank_local(
+  int count,
+  const void* buf,
+  uint64_t* groups,
+  uint64_t  group_id[],
+  uint64_t  group_ranks[],
+  uint64_t  group_rank[],
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints)
+{
+  /* defer to Rankv for now */
+  MPI_Comm comm = dtcmp_comm_self;
+  return DTCMP_Rankv(
+    count, buf,
+    groups, group_id, group_ranks, group_rank,
+    key, keysat, cmp, hints, comm
+  );
+}
+
+int DTCMP_Rank_strings_local(
+  int count,
+  const char* strings[],
+  uint64_t* groups,
+  uint64_t  group_id[],
+  uint64_t  group_ranks[],
+  uint64_t  group_rank[],
+  DTCMP_Flags hints)
+{
+  /* defer to Rankv_strings for now */
+  MPI_Comm comm = dtcmp_comm_self;
+  return DTCMP_Rankv_strings(
+    count, strings,
+    groups, group_id, group_ranks, group_rank,
+    hints, comm
+  );
+}
+
+int DTCMP_Rank(
+  int count,
+  const void* buf,
+  uint64_t* groups,
+  uint64_t  group_id[],
+  uint64_t  group_ranks[],
+  uint64_t  group_rank[],
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Comm comm)
+{
+  /* defer to Rankv for now */
+  return DTCMP_Rankv(
+    count, buf,
+    groups, group_id, group_ranks, group_rank,
+    key, keysat, cmp, hints, comm
+  );
+}
+
+int DTCMP_Rank_strings(
+  int count,
+  const char* strings[],
+  uint64_t* groups,
+  uint64_t  group_id[],
+  uint64_t  group_ranks[],
+  uint64_t  group_rank[],
+  DTCMP_Flags hints,
+  MPI_Comm comm)
+{
+  /* defer to Rankv_strings for now */
+  return DTCMP_Rankv_strings(
+    count, strings,
+    groups, group_id, group_ranks, group_rank,
+    hints, comm
+  );
+}
+
 int DTCMP_Rankv(
   int count,
   const void* buf,
@@ -1128,5 +1204,9 @@ int DTCMP_Rankv_strings(
     return DTCMP_FAILURE;
   }
 
-  return DTCMP_Rankv_strings_sort(count, strings, groups, group_id, group_ranks, group_rank, hints, comm);
+  return DTCMP_Rankv_strings_sort(
+    count, strings,
+    groups, group_id, group_ranks, group_rank,
+    hints, comm
+  );
 }

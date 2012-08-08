@@ -19,6 +19,51 @@
 #define ASSIGN_RANKS  (2)
 #define ASSIGN_NEXT   (3)
 
+/* computes first-in-group and last-in-group flags for each local item,
+ * disregarding first-in-group for first item and last-in-group for
+ * last item since those can be affected by items on other procs,
+ * we do this separately from detect_edges to (eventually) reuse code
+ * for Rank_local */
+static int detect_edges_interior(
+  const void* buf,
+  int num,
+  MPI_Datatype item,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  int first_in_group[],
+  int last_in_group[])
+{
+  /* get true extent of item */
+  MPI_Aint lb, extent;
+  MPI_Type_get_extent(item, &lb, &extent);
+
+  /* we can directly compute the edges for all elements but the endpoints */
+  int i;
+  const char* left_data  = (const char*)buf;
+  const char* right_data = (const char*)buf + extent;
+  for (i = 1; i < num; i++) {
+    int result = dtcmp_op_eval(left_data, right_data, cmp);
+    if (result != 0) {
+      /* the left item is different from the right item,
+       * mark the right item as the leader of a new group,
+       * and mark the left as the last of its group */
+      first_in_group[i]  = 1;
+      last_in_group[i-1] = 1;
+    } else {
+      /* the items are equal, so the right is not the start of a group,
+       * nor is the left the end of a group */
+      first_in_group[i]  = 0;
+      last_in_group[i-1] = 0;
+    }
+
+    /* point to the next element */
+    left_data = right_data;
+    right_data += extent;
+  }
+
+  return DTCMP_SUCCESS;
+}
+
 static int detect_edges(
   const void* buf,
   int num,
@@ -39,14 +84,18 @@ static int detect_edges(
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &ranks);
 
+  /* get extent of item */
+  MPI_Aint lb, extent;
+  MPI_Type_get_extent(item, &lb, &extent);
+
   /* get true extent of item */
-  MPI_Aint lb, size;
-  MPI_Type_get_true_extent(item, &lb, &size);
+  MPI_Aint true_lb, true_extent;
+  MPI_Type_get_true_extent(item, &true_lb, &true_extent);
 
   /* compute the size of the scan item, we'll send the rank the
    * process should exchange data with in the next round,
    * a flag to indicate whether the item is valid, and the item itself */
-  size_t scan_buf_size = 2 * sizeof(int) + size;
+  size_t scan_buf_size = 2 * sizeof(int) + true_extent;
 
   /* build type for exchange */
   MPI_Datatype type_item;
@@ -63,21 +112,7 @@ static int detect_edges(
   char* send_right_buf = dtcmp_malloc(scan_buf_size, 0, __FILE__, __LINE__);
 
   /* we can directly compute the edges for all elements but the endpoints */
-  int i;
-  for (i = 1; i < num; i++) {
-    /* if the left item is different from the right item,
-    * mark the right item as the leader of a new group */
-    const char* left_data  = (char*)buf + (i-1) * size;
-    const char* right_data = (char*)buf + (i)   * size;
-    int result = dtcmp_op_eval(left_data, right_data, cmp);
-    if (result != 0) {
-      first_in_group[i]  = 1;
-      last_in_group[i-1] = 1;
-    } else {
-      first_in_group[i]  = 0;
-      last_in_group[i-1] = 0;
-    }
-  }
+  detect_edges_interior(buf, num, item, cmp, hints, first_in_group, last_in_group);
 
   /* to compute the edges for our endpoints we use left-to-right and
    * right-to-left scan operations -- we can't just do point-to-point
@@ -99,13 +134,13 @@ static int detect_edges(
 
   /* get pointers to first and last items in buffer */
   char* buf_first = (char*)buf;
-  char* buf_last  = (char*)buf + (num-1) * size;
+  char* buf_last  = (char*)buf + (num-1) * extent;
 
   /* copy the value from our rightmost element into our left-to-right
    * scan buffer assume that we don't have a valid value */
   send_left_ints[DETECT_VALID]  = 0;
   send_right_ints[DETECT_VALID] = 0;
-  if (size > 0 && num > 0) {
+  if (true_extent > 0 && num > 0) {
     /* copy value from our leftmost element into right-to-left scan buffer */
     send_left_ints[DETECT_VALID] = 1;
     DTCMP_Memcpy(send_left_buf + 2 * sizeof(int), 1, item, buf_first, 1, item);
@@ -167,7 +202,7 @@ static int detect_edges(
 
     /* if we have a left partner, merge his data with our right-going data */
     if (left_rank != MPI_PROC_NULL) {
-      if (size > 0 && num > 0 && !made_left_comparison && recv_left_ints[DETECT_VALID]) {
+      if (true_extent > 0 && num > 0 && !made_left_comparison && recv_left_ints[DETECT_VALID]) {
         /* compare our leftmost value with the value we receive from the left,
          * if our value is different, mark it as the start of a new group */
         int result = dtcmp_op_eval(recv_left_buf + 2 * sizeof(int), buf_first, cmp);
@@ -189,7 +224,7 @@ static int detect_edges(
 
     /* if we have a right partner, merge his data with our left-going data */
     if (right_rank != MPI_PROC_NULL) {
-      if (size > 0 && num > 0 && !made_right_comparison && recv_right_ints[DETECT_VALID]) {
+      if (true_extent > 0 && num > 0 && !made_right_comparison && recv_right_ints[DETECT_VALID]) {
         /* compare our rightmost value with the value we receive from the right,
          * if our value is different, mark it as the end of a group */
         int result = dtcmp_op_eval(recv_right_buf + 2 * sizeof(int), buf_last, cmp);
