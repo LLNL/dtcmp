@@ -389,7 +389,7 @@ int DTCMP_Finalize()
 }
 
 /* concatenates types back-to-back into a single type */
-int DTCMP_Type_create_series(int num, MPI_Datatype types[], MPI_Datatype &newtype)
+int DTCMP_Type_create_series(int num, MPI_Datatype types[], MPI_Datatype* newtype)
 {
   int rc = DTCMP_SUCCESS;
 

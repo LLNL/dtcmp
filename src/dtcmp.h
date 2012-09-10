@@ -79,7 +79,7 @@ int DTCMP_Finalize();
 int DTCMP_Type_create_series(
   int num,              /* IN  - number of datatypes in types array (non-negative integer) */
   MPI_Datatype types[], /* IN  - datatypes to combine (array of handles of length num) */
-  MPI_Datatype &newtype /* OUT - new datatype (handle) */
+  MPI_Datatype* newtype /* OUT - new datatype (handle) */
 );
 
 /* ----------------------------------------------
