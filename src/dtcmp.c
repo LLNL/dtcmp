@@ -388,6 +388,30 @@ int DTCMP_Finalize()
   return DTCMP_SUCCESS;
 }
 
+/* concatenates types back-to-back into a single type */
+int DTCMP_Type_create_series(int num, MPI_Datatype types[], MPI_Datatype &newtype)
+{
+  int rc = DTCMP_SUCCESS;
+
+  /* in case we don't crate a type */
+  *newtype = MPI_DATATYPE_NULL;
+
+  /* check that all types are valid */
+  int i;
+  for (i = 0; i < num; i++) {
+    if (! dtcmp_type_is_valid(types[i])) {
+      return DTCMP_FAILURE;
+    }
+  }
+
+  /* create the type */
+  if (num > 0) {
+    rc = dtcmp_type_concat(num, types, newtype);
+  }
+
+  return rc;
+}
+
 /* make a full copy of a comparison operation */
 int DTCMP_Op_dup(DTCMP_Op cmp, DTCMP_Op* newcmp)
 {
@@ -936,7 +960,7 @@ int DTCMP_Sort(
   }
 
   /* determine the total number of elements across all procs */
-  uint64_t sum = count * ranks;
+  uint64_t sum = (uint64_t)count * (uint64_t)ranks;
 
   /* nothing to do if the total element count is 0 */
   if (sum == 0) {

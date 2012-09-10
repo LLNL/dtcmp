@@ -72,6 +72,17 @@ int DTCMP_Init();
 int DTCMP_Finalize();
 
 /* ----------------------------------------------
+ * Functions to create types
+ * ---------------------------------------------- */
+
+/* concatenates types back-to-back into a single type */
+int DTCMP_Type_create_series(
+  int num,              /* IN  - number of datatypes in types array (non-negative integer) */
+  MPI_Datatype types[], /* IN  - datatypes to combine (array of handles of length num) */
+  MPI_Datatype &newtype /* OUT - new datatype (handle) */
+);
+
+/* ----------------------------------------------
  * Comparison Operation Handles
  * ---------------------------------------------- */
 
