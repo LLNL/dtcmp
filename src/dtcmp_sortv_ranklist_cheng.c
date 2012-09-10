@@ -353,7 +353,7 @@ static int find_exact_splitters(
     }
 
     /* now get global counts across all procs */
-    lwgrp_logring_allreduce(
+    lwgrp_logring_allreduce_recursive(
       counts, all_counts, 2 * group_ranks, MPI_INT, MPI_SUM,
       ring, logring
     );
