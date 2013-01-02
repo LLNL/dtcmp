@@ -340,7 +340,7 @@ static int assign_ids(
 
     /* send and receive data with left partner */
     if (left_rank != MPI_PROC_NULL) {
-      MPI_Irecv(recv_left_ints, 4, MPI_INT, left_rank, 0, comm, &request[k]);
+      MPI_Irecv(recv_left_ints, 4, MPI_UINT64_T, left_rank, 0, comm, &request[k]);
       k++;
 
       if (right_rank != MPI_PROC_NULL) {
@@ -348,13 +348,13 @@ static int assign_ids(
       } else {
         send_left_ints[ASSIGN_NEXT] = SHIFTED_MPI_PROC_NULL;
       }
-      MPI_Isend(send_left_ints, 4, MPI_INT, left_rank, 0, comm, &request[k]);
+      MPI_Isend(send_left_ints, 4, MPI_UINT64_T, left_rank, 0, comm, &request[k]);
       k++;
     }
 
     /* send and receive data with right partner */
     if (right_rank != MPI_PROC_NULL) {
-      MPI_Irecv(recv_right_ints, 4, MPI_INT, right_rank, 0, comm, &request[k]);
+      MPI_Irecv(recv_right_ints, 4, MPI_UINT64_T, right_rank, 0, comm, &request[k]);
       k++;
 
       if (left_rank != MPI_PROC_NULL) {
@@ -362,7 +362,7 @@ static int assign_ids(
       } else {
         send_right_ints[ASSIGN_NEXT] = SHIFTED_MPI_PROC_NULL;
       } 
-      MPI_Isend(send_right_ints, 4, MPI_INT, right_rank, 0, comm, &request[k]);
+      MPI_Isend(send_right_ints, 4, MPI_UINT64_T, right_rank, 0, comm, &request[k]);
       k++;
     }
 
