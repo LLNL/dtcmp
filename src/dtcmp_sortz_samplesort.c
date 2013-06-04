@@ -253,6 +253,19 @@ int DTCMP_Sortz_samplesort(
     return DTCMP_FAILURE;
   }
 
+  /* get my rank and number of ranks in comm */
+  int rank, ranks;
+  MPI_Comm_rank(comm, &rank);
+  MPI_Comm_size(comm, &ranks);
+
+  /* TODO: can't handle case where ranks == 1 */
+  if (ranks <= 1) {
+    *outbuf = NULL;
+    *outcount = 0;
+    *handle = DTCMP_HANDLE_NULL;
+    return DTCMP_FAILURE;
+  }
+
   /* if the input elements are not unique, we'll call a function to
    * to force them to be unique by attaching additional components,
    * this also builds new types and comparison ops */
@@ -309,11 +322,6 @@ int DTCMP_Sortz_samplesort(
   if (s == 0 && incount > 0) {
     s = 1;
   }
-
-  /* get my rank and number of ranks in comm */
-  int rank, ranks;
-  MPI_Comm_rank(comm, &rank);
-  MPI_Comm_size(comm, &ranks);
 
   /* get lower bound and extent of key */
   MPI_Aint uniqkey_true_lb, uniqkey_true_extent;

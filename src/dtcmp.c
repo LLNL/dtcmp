@@ -1290,8 +1290,12 @@ int DTCMP_Sortz(
     return DTCMP_SUCCESS;
   }
 
-  /* for now, we can only use sample sort if min==max */
-  if (min == max) {
+  /* can't call sample sort with a single process right now */
+  int ranks;
+  MPI_Comm_size(comm, &ranks);
+
+  /* for now, we can only use sample sort if min==max and ranks > 1*/
+  if (min == max && ranks > 1) {
     /* TODO: if number of elements per process is small,
      * call bitonic sort */
     return DTCMP_Sortz_samplesort(
