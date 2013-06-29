@@ -1060,11 +1060,6 @@ int DTCMP_Sort_local(
 
   /* select algorithm based on number of elements */
 
-  /* nothing to do with one or fewer elements (already sorted) */
-  if (count < 2) {
-    return DTCMP_SUCCESS;
-  }
-
   /* pick algorithm based on number of elements */
   if (count <= DTCMP_SORT_LOCAL_THRESHOLD_INSERTION) {
     /* for a small number of elements, insertion sort is fastest */
@@ -1313,7 +1308,7 @@ int DTCMP_Sortz(
   DTCMP_Sortv(inbuf, *outbuf, count, key, keysat, cmp, hints, comm);
   *outcount = count;
 
-  return DTCMP_FAILURE;
+  return DTCMP_SUCCESS;
 }
 
 int DTCMP_Rank_local(
