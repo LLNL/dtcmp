@@ -678,6 +678,54 @@ int DTCMP_Op_eval(
   }
 }
 
+/* creates fixed length string and comparison operation
+ * for specified number of chars */
+int DTCMP_Str_create_ascend(
+  int chars,
+  MPI_Datatype* type,
+  DTCMP_Op* cmp)
+{
+  if (chars <= 0 || type == NULL || cmp == NULL) {
+    return DTCMP_FAILURE;
+  }
+
+  MPI_Datatype dt;
+  MPI_Type_contiguous(chars, MPI_CHAR, &dt);
+  MPI_Type_commit(&dt);
+
+  DTCMP_Op op;
+  DTCMP_Op_create(dt, dtcmp_op_fn_strcmp_ascend, &op);
+
+  *type = dt;
+  *cmp  = op;
+
+  return DTCMP_SUCCESS;
+}
+
+/* same as above but comparison op sorts in reverse order */
+int DTCMP_Str_create_descend(
+  int chars,
+  MPI_Datatype* type,
+  DTCMP_Op* cmp)
+{
+  if (chars <= 0 || type == NULL || cmp == NULL) {
+    return DTCMP_FAILURE;
+  }
+
+  MPI_Datatype dt;
+  MPI_Type_contiguous(chars, MPI_CHAR, &dt);
+  MPI_Type_commit(&dt);
+
+  DTCMP_Op op;
+  DTCMP_Op_create(dt, dtcmp_op_fn_strcmp_descend, &op);
+
+  *type = dt;
+  *cmp  = op;
+
+  return DTCMP_SUCCESS;
+}
+
+
 /* free resources associated with handle, if any */
 int DTCMP_Free(DTCMP_Handle* handle)
 {

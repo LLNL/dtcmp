@@ -233,6 +233,30 @@ int DTCMP_Op_eval(
 );
 
 /* ----------------------------------------------
+ * String type and op creation
+ * ---------------------------------------------- */
+
+/* DTCMP requires fixed length fields, but sorting strings
+ * is a common requirement.  This function is a convenience
+ * to simplify creating a fixed-length string type and
+ * associated comparison operation.  The caller specifies
+ * the string length, and the function returns a type and op,
+ * which the caller is responsible for freeing with MPI_Type_free
+ * and DTCMP_Op_free. The comparison operation uses strcmp(). */
+int DTCMP_Str_create_ascend(
+  int chars,          /* IN  - number of chars in string */
+  MPI_Datatype* type, /* OUT - committed MPI_Type_contiguous */
+  DTCMP_Op* cmp       /* OUT - comparison operation */
+);
+
+/* same as above but comparison op sorts in reverse order */
+int DTCMP_Str_create_descend(
+  int chars,          /* IN  - number of chars in string */
+  MPI_Datatype* type, /* OUT - committed MPI_Type_contiguous */
+  DTCMP_Op* cmp       /* OUT - comparison operation */
+);
+
+/* ----------------------------------------------
  * Resource handles
  * ---------------------------------------------- */
 
