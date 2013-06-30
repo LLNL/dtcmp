@@ -696,12 +696,8 @@ int DTCMP_Rankv_strings_sort(
 
   /* build type to use as key and keysat types */
   MPI_Datatype type_string;
-  MPI_Type_contiguous(allmax, MPI_CHAR, &type_string);
-  MPI_Type_commit(&type_string);
-
-  /* build string comparison function */
   DTCMP_Op cmp_string;
-  DTCMP_Op_create(type_string, dtcmp_op_fn_strcmp_ascend, &cmp_string);
+  DTCMP_Str_create_ascend(allmax, &type_string, &cmp_string);
 
   /* rank items */
   int rc = DTCMP_Rankv_sort(
