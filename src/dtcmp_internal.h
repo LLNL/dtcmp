@@ -499,20 +499,6 @@ int DTCMP_Sortv_cheng(
   MPI_Comm comm
 );
 
-int DTCMP_Sortv_ranklist_cheng(
-  const void* inbuf,
-  void* outbuf,
-  int count,
-  MPI_Datatype key,
-  MPI_Datatype keysat,
-  DTCMP_Op cmp,
-  DTCMP_Flags hints,
-  int group_rank,
-  int group_ranks,
-  const int comm_ranklist[],
-  MPI_Comm comm
-);
-
 /* ---------------------------------------
  * Sortz implementations
  * --------------------------------------- */

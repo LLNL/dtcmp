@@ -688,7 +688,7 @@ static int exact_split_exchange_merge(
   return DTCMP_SUCCESS;
 }
 
-int DTCMP_Sortv_ranklist_cheng(
+int DTCMP_Sortv_cheng(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -696,9 +696,6 @@ int DTCMP_Sortv_ranklist_cheng(
   MPI_Datatype keysat,
   DTCMP_Op cmp,
   DTCMP_Flags hints,
-  int group_rank,
-  int group_ranks,
-  const int comm_ranklist[],
   MPI_Comm comm)
 {
   /* algorithm
@@ -708,12 +705,15 @@ int DTCMP_Sortv_ranklist_cheng(
    * 3) identify split points in local data
    * 4) send data to final process with alltoall/alltoallv
    * 5) merge data into final sorted order */
+  int group_rank, group_ranks;
+  MPI_Comm_rank(comm, &group_rank);
+  MPI_Comm_size(comm, &group_ranks);
 
   /* create ring and logring from our ranklist */
   lwgrp_ring ring;
   lwgrp_logring logring;
-  lwgrp_ring_build_from_list(comm, group_ranks, comm_ranklist, &ring);
-  lwgrp_logring_build_from_list(comm, group_ranks, comm_ranklist, &logring);
+  lwgrp_ring_build_from_mpicomm(comm, &ring);
+  lwgrp_logring_build_from_mpicomm(comm, &logring);
 
   /* TODO: incorporate scans to avoid this requirement */
   /* ensure all elements are unique */

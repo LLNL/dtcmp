@@ -46,7 +46,6 @@ libdtcmp_la_SOURCES = \
   dtcmp_sortv_allgather.c \
   dtcmp_sortv_sortgather_scatter.c \
   dtcmp_sortv_cheng.c \
-  dtcmp_sortv_ranklist_cheng.c \
   dtcmp_sortz_samplesort.c \
   dtcmp_rankv_sort.c
 libdtcmp_la_CFLAGS = $(INCLUDES)
