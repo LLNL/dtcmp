@@ -12,7 +12,7 @@
 #include <string.h>
 #include "mpi.h"
 #include "dtcmp_internal.h"
-#include "lwgrp.h"
+#include "lwgrp_comm.h"
 
 /* This implementation is based on ideas from:
  *
@@ -73,13 +73,13 @@ static void compute_weighted_median(
   MPI_Datatype type_int_with_key,
   DTCMP_Op cmp_int_with_key,
   DTCMP_Flags hints,
-  int group_rank,
-  int group_ranks,
-  const lwgrp_ring* ring,
-  const lwgrp_logring* logring,
-  MPI_Comm comm)
+  const lwgrp_comm* lwgcomm)
 {
   int i;
+
+  /* get number of ranks */
+  int ranks;
+  lwgrp_comm_size(lwgcomm, &ranks);
 
   /* get true extent of key */
   MPI_Aint key_true_lb, key_true_extent;
@@ -91,20 +91,19 @@ static void compute_weighted_median(
   char* all_num_with_median = (char*)scratch + size_int_with_key;
 
   /* scatter weights and medians to different ranks */
-  lwgrp_logring_alltoall_brucks(
-    my_num_with_median, all_num_with_median, 1, type_int_with_key,
-    ring, logring
+  lwgrp_comm_alltoall(
+    my_num_with_median, all_num_with_median, 1, type_int_with_key, lwgcomm
   );
 
   /* sort by medians value (ensuring that count is non-zero) */
   DTCMP_Sort_local(
-    DTCMP_IN_PLACE, all_num_with_median, group_ranks,
+    DTCMP_IN_PLACE, all_num_with_median, ranks,
     type_int_with_key, type_int_with_key, cmp_int_with_key, hints
   );
 
   /* compute total number of elements */
   int N = 0;
-  for (i = 0; i < group_ranks; i++) {
+  for (i = 0; i < ranks; i++) {
     int cnt = *(int*) (all_num_with_median + i * size_int_with_key);
     N += cnt;
   }
@@ -115,7 +114,7 @@ static void compute_weighted_median(
   int half_weight   = N / 2;
   char* ptr = all_num_with_median;
   void* target = (void*) (ptr + sizeof(int));
-  while(i < group_ranks) {
+  while(i < ranks) {
     /* set our target to the current median
      * and initialize our current weight */
     target = (void*) (ptr + sizeof(int));
@@ -124,7 +123,7 @@ static void compute_weighted_median(
     ptr += size_int_with_key;
 
     /* add weights for any elements which equal this current median */
-    if (i < group_ranks) {
+    if (i < ranks) {
       int result;
       int next_weight = *(int*) ptr;
       if (next_weight > 0) {
@@ -133,14 +132,14 @@ static void compute_weighted_median(
       } else {
         result = 0;
       }
-      while (i < group_ranks && result == 0) {
+      while (i < ranks && result == 0) {
         /* current item is equal to target, add its weight */
         current_weight += next_weight;
         i++;
         ptr += size_int_with_key;
 
         /* get weight and comparison result of next item if one exists */
-        if (i < group_ranks) {
+        if (i < ranks) {
           next_weight = *(int*) ptr;
           if (next_weight > 0) {
             void* next_target = (void*) (ptr + sizeof(int));
@@ -171,9 +170,8 @@ static void compute_weighted_median(
   memcpy(num_with_median + sizeof(int), target, key_true_extent);
 
   /* broadcast medians */
-  lwgrp_logring_allgather_brucks(
-    num_with_median, out_num_with_median, 1, type_int_with_key,
-    ring, logring
+  lwgrp_comm_allgather(
+    num_with_median, out_num_with_median, 1, type_int_with_key, lwgcomm
   );
 
   return;
@@ -189,13 +187,13 @@ static int find_exact_splitters(
   int serial_search_threshold,
   void* splitters,
   int splitters_valid[],
-  int group_rank,
-  int group_ranks,
-  const lwgrp_ring* ring,
-  const lwgrp_logring* logring,
-  MPI_Comm comm)
+  const lwgrp_comm* lwgcomm)
 {
   int i;
+
+  /* get number of ranks */
+  int ranks;
+  lwgrp_comm_size(lwgcomm, &ranks);
 
   /* get extent of keysat type so we can compute offsets into data buffer */
   MPI_Aint keysat_lb, keysat_extent;
@@ -209,60 +207,60 @@ static int find_exact_splitters(
   /* allocate scratch space */
 
   /* indicies of splitters */
-  int* k = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* k = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* tracks current lowest index of each of active range */
-  int* index = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* index = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* tracks number of items in each active range */
-  int* num = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* num = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* flag per rank signifying whether its median is exact */
-  int* found_exact = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* found_exact = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* candidate median for each splitter with count from local rank */
-  char* my_num_with_median = dtcmp_malloc(group_ranks * size_int_with_key, 0, __FILE__, __LINE__); 
+  char* my_num_with_median = dtcmp_malloc(ranks * size_int_with_key, 0, __FILE__, __LINE__); 
 
   /* candidate splitters after each median-of-medians round */
-  char* out_num_with_median = dtcmp_malloc(group_ranks * size_int_with_key, 0, __FILE__, __LINE__);
+  char* out_num_with_median = dtcmp_malloc(ranks * size_int_with_key, 0, __FILE__, __LINE__);
 
   /* number of items less than and equal to each candidate median */
-  int* counts = dtcmp_malloc(2 * group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* counts = dtcmp_malloc(2 * ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* total number of items less than and equal to each candidate median */
-  int* all_counts = dtcmp_malloc(2 * group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* all_counts = dtcmp_malloc(2 * ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* number of items we'll receive from each rank */
-  int* recvcounts = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* recvcounts = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* displacement of each set of items we'll receive from each rank */
-  int* recvdispls = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* recvdispls = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* number of items we'll send to each rank */
-  int* sendcounts = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* sendcounts = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* displacement of each set of items we'll send to each rank */
-  int* senddispls = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* senddispls = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* scratch space used to compute median-of-medians */
-  void* weighted_median_scratch = dtcmp_malloc((group_ranks + 1) * size_int_with_key, 0, __FILE__, __LINE__);
+  void* weighted_median_scratch = dtcmp_malloc((ranks + 1) * size_int_with_key, 0, __FILE__, __LINE__);
 
   /* compute split points based on the number of items each task contributes,
    * we want the task to end up with the same number of elements */
 
   /* gather number of elements each process is contributing
    * (borrow the index array for this task) */
-  lwgrp_logring_allgather_brucks(&n, index, 1, MPI_INT, ring, logring);
+  lwgrp_comm_allgather(&n, index, 1, MPI_INT, lwgcomm);
 
   /* compute ranks of split points (start from 1) */
   int count = 1;
-  for (i = 0; i < group_ranks; i++) {
+  for (i = 0; i < ranks; i++) {
     k[i] = count;
     count += index[i];
   }
 
   /* initialize our active ranges */
-  for (i = 0; i < group_ranks; i++) {
+  for (i = 0; i < ranks; i++) {
     index[i] = 0;
     num[i]   = n;
     found_exact[i] = 0;
@@ -282,7 +280,7 @@ static int find_exact_splitters(
     /* for each range, pick a median and record number of active elements
      * we have in that range */
     char* ptr = my_num_with_median;
-    for (i = 0; i < group_ranks; i++) {
+    for (i = 0; i < ranks; i++) {
       /* record number of active elements for this range */
       memcpy(ptr, &num[i], sizeof(int));
       if (num[i] > 0) {
@@ -302,14 +300,13 @@ static int find_exact_splitters(
      * of active elements, N */
     compute_weighted_median(
       (const void*)my_num_with_median, (void*)out_num_with_median, weighted_median_scratch,
-      key, cmp, type_int_with_key, cmp_int_with_key, hints,
-      group_rank, group_ranks, ring, logring, comm
+      key, cmp, type_int_with_key, cmp_int_with_key, hints, lwgcomm
     );
 
     /* stop if for each range, N is below threshold or if we found
      * an exact match */
     int can_break = 1;
-    for (i = 0; i < group_ranks; i++) {
+    for (i = 0; i < ranks; i++) {
       int N = *(int*) (out_num_with_median + i * size_int_with_key);
 
       /* if we have a count of zero, there's no splitter */
@@ -329,7 +326,7 @@ static int find_exact_splitters(
     }
 
     /* compute local counts of elements less-than, equal-to, and greater-than M */
-    for (i = 0; i < group_ranks; i++) {
+    for (i = 0; i < ranks; i++) {
       /* if we already found the split point for this range,
        * or if we don't have any active elements, go to next */
       if (found_exact[i] || num[i] == 0) {
@@ -353,13 +350,12 @@ static int find_exact_splitters(
     }
 
     /* now get global counts across all procs */
-    lwgrp_logring_allreduce_recursive(
-      counts, all_counts, 2 * group_ranks, MPI_INT, MPI_SUM,
-      ring, logring
+    lwgrp_comm_allreduce(
+      counts, all_counts, 2 * ranks, MPI_INT, MPI_SUM, lwgcomm
     );
 
     /* based on rank of splitter, chop down our active range */
-    for (i = 0; i < group_ranks; i++) {
+    for (i = 0; i < ranks; i++) {
       /* if we already found the split point for this range, go to next */
       if (found_exact[i]) {
         continue;
@@ -390,7 +386,7 @@ static int find_exact_splitters(
 
   /* check whether all values are already exact */
   int all_exact = 1;
-  for (i = 0; i < group_ranks; i++) {
+  for (i = 0; i < ranks; i++) {
     if (!found_exact[i]) {
       all_exact = 0;
       break;
@@ -399,7 +395,7 @@ static int find_exact_splitters(
 
   if (all_exact) {
     /* if we found all values exactly, then just copy them into array */
-    for (i = 0; i < group_ranks; i++) {
+    for (i = 0; i < ranks; i++) {
       splitters_valid[i] = *(int*) (out_num_with_median + i * size_int_with_key);
       if (splitters_valid[i] != 0) {
         memcpy(
@@ -414,7 +410,7 @@ static int find_exact_splitters(
 
     /* if we found exact median for any section,
      * we can avoid sending and sorting */
-    for (i = 0; i < group_ranks; i++) {
+    for (i = 0; i < ranks; i++) {
       senddispls[i] = index[i];
       sendcounts[i] = num[i];
       if (found_exact[i]) {
@@ -423,14 +419,13 @@ static int find_exact_splitters(
     }
 
     /* inform each rank how many elements we will be sending in alltoallv */
-    lwgrp_logring_alltoall_brucks(
-      sendcounts, recvcounts, 1, MPI_INT,
-      ring, logring
+    lwgrp_comm_alltoall(
+      sendcounts, recvcounts, 1, MPI_INT, lwgcomm
     );
 
     /* build our displacement arrays for alltoallv call */
     int recvdisp = 0;
-    for (i = 0; i < group_ranks; i++) {
+    for (i = 0; i < ranks; i++) {
       recvdispls[i] = recvdisp;
       recvdisp += recvcounts[i];
     }
@@ -456,29 +451,29 @@ static int find_exact_splitters(
     ranklist_alltoallv_linear(
       data, sendcounts, senddispls,
       recvdata, recvcounts, recvdispls,
-      key, group_rank, group_ranks, comm_ranklist, comm
+      key, rank, ranks, comm_ranklist, comm
     );
 
     /* sort elements if we received any */
-    void* my_M = out_num_with_median + group_rank * size_int_with_key + sizeof(int);
-    if (!found_exact[group_rank] && recvdisp > 0) {
+    void* my_M = out_num_with_median + rank * size_int_with_key + sizeof(int);
+    if (!found_exact[rank] && recvdisp > 0) {
       /* get our local rank in comm for error reporting */
       int comm_rank;
       MPI_Comm_rank(comm, &comm_rank);
 
       /* verify that the number we received matches the number we expcted to receive */
-      int my_N = *(int*) (out_num_with_median + group_rank * size_int_with_key);
+      int my_N = *(int*) (out_num_with_median + rank * size_int_with_key);
       int numrecv = recvdisp;
       if (numrecv != my_N) {
         /* TODO: shouldn't happen */
-        printf("%d: ERROR: Rank %d failed to find splitter\n", comm_rank, group_rank);
+        printf("%d: ERROR: Rank %d failed to find splitter\n", comm_rank, rank);
       }
 
       /* TODO: convert this to a kway merge */
       DTCMP_Sort_local(DTCMP_IN_PLACE, recvdata, numrecv, key, key, cmp);
 
       /* identify kth element and broadcast */
-      int k_index = k[group_rank] - 1;
+      int k_index = k[rank] - 1;
       if (k_index < numrecv) {
         my_M = recvdata + k_index * keysize;
       } else {
@@ -490,7 +485,7 @@ static int find_exact_splitters(
     }
 
     /* each process has now computed one splitter, gather all splitters to all procs */
-    ranklist_allgather_brucks(my_M, splitters, 1, key, group_rank, group_ranks, comm_ranklist, comm);
+    ranklist_allgather_brucks(my_M, splitters, 1, key, rank, ranks, comm_ranklist, comm);
 
     if (recvdata != NULL) {
       free(recvdata);
@@ -526,19 +521,19 @@ static int exact_split_exchange_merge(
   DTCMP_Flags hints,
   void* splitters,
   int splitters_valid[],
-  int group_rank,
-  int group_ranks,
-  const lwgrp_ring* ring,
-  const lwgrp_logring* logring,
-  MPI_Comm comm)
+  const lwgrp_comm* lwgcomm)
 {
   int i;
 
+  /* get number of ranks */
+  int ranks;
+  lwgrp_comm_size(lwgcomm, &ranks);
+
   /* number of items we'll send to each proc */
-  int* sendcounts = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* sendcounts = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* set all send counts to zero */
-  for (i = 0; i < group_ranks; i++) {
+  for (i = 0; i < ranks; i++) {
     sendcounts[i] = 0;
   }
 
@@ -554,13 +549,13 @@ static int exact_split_exchange_merge(
     MPI_Type_get_true_extent(key, &key_true_lb, &key_true_extent);
 
     /* arrays to hold values in Search_low_list call */
-    char* splitters_search = dtcmp_malloc(group_ranks * key_true_extent, 0, __FILE__, __LINE__);
-    int* flags    = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
-    int* indicies = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+    char* splitters_search = dtcmp_malloc(ranks * key_true_extent, 0, __FILE__, __LINE__);
+    int* flags    = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
+    int* indicies = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
     /* only consider valid splitters */
     int num_splitters = 0;
-    for (i = 0; i < group_ranks; i++) {
+    for (i = 0; i < ranks; i++) {
       if (splitters_valid[i]) {
         char* src = (char*)splitters + i * key_extent;
         char* dst = splitters_search + num_splitters * key_extent;
@@ -580,7 +575,7 @@ static int exact_split_exchange_merge(
     i = 0;
     int j = 0;
     int start_index = 0;
-    while (i < group_ranks) {
+    while (i < ranks) {
       if (splitters_valid[i]) {
         /* there may be a non-zero count for this range, look for next
          * valid splitter to get index */
@@ -591,7 +586,7 @@ static int exact_split_exchange_merge(
           /* there's at least one more valid splitter out there,
            * find its index */
           int k = i + 1;
-          while (k < group_ranks && !splitters_valid[k]) {
+          while (k < ranks && !splitters_valid[k]) {
             k++;
           }
           sendcounts[i] = indicies[j] - start_index;
@@ -600,7 +595,7 @@ static int exact_split_exchange_merge(
           /* no more valid splitters, assign whatever is left to
            * this range */
           sendcounts[i] = count - start_index;
-          i = group_ranks;
+          i = ranks;
         }
       } else {
         /* leave this range set to a 0 count */
@@ -615,24 +610,23 @@ static int exact_split_exchange_merge(
   }
 
   /* number of items we'll receive from each proc */
-  int* recvcounts = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* recvcounts = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* inform other processes how many elements we'll be sending to each */
-  lwgrp_logring_alltoall_brucks(
-    sendcounts, recvcounts, 1, MPI_INT,
-    ring, logring
+  lwgrp_comm_alltoall(
+    sendcounts, recvcounts, 1, MPI_INT, lwgcomm
   );
 
   /* displacement for each of our send ranges */
-  int* senddispls = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* senddispls = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* displacement for each of our receive ranges */
-  int* recvdispls = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* recvdispls = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* build our displacement arrays for alltoallv call */
   int recvdisp = 0;
   int senddisp = 0;
-  for (i = 0; i < group_ranks; i++) {
+  for (i = 0; i < ranks; i++) {
     recvdispls[i] = recvdisp;
     recvdisp += recvcounts[i];
 
@@ -651,29 +645,29 @@ static int exact_split_exchange_merge(
 
   /* exchange data */
   char* recvdata = kbuf;
-  lwgrp_logring_alltoallv_linear(
+  lwgrp_comm_alltoallv(
     outbuf, sendcounts, senddispls,
     recvdata, recvcounts, recvdispls,
-    keysat, ring, logring
+    keysat, lwgcomm
   );
 
   /* pointer to set of items we receive from each proc */
-  const void** kbufs = dtcmp_malloc(group_ranks * sizeof(void*), 0, __FILE__, __LINE__);
+  const void** kbufs = dtcmp_malloc(ranks * sizeof(void*), 0, __FILE__, __LINE__);
 
   /* number of items we receive from each proc */
-  int* ksizes = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  int* ksizes = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* if we received any elements, sort them */
   if (recvdisp > 0) {
     /* set up pointers and sizes to our k buffers */
     size_t koffset = 0;
-    for (i = 0; i < group_ranks; i++) {
+    for (i = 0; i < ranks; i++) {
       int elements = recvcounts[i];
       kbufs[i]  = recvdata + koffset;
       ksizes[i] = elements;
       koffset += elements * keysat_true_extent;
     }
-    DTCMP_Merge_local(group_ranks, kbufs, ksizes, outbuf, key, keysat, cmp, hints);
+    DTCMP_Merge_local(ranks, kbufs, ksizes, outbuf, key, keysat, cmp, hints);
   }
 
   /* free memory */
@@ -705,15 +699,10 @@ int DTCMP_Sortv_cheng(
    * 3) identify split points in local data
    * 4) send data to final process with alltoall/alltoallv
    * 5) merge data into final sorted order */
-  int group_rank, group_ranks;
-  MPI_Comm_rank(comm, &group_rank);
-  MPI_Comm_size(comm, &group_ranks);
 
   /* create ring and logring from our ranklist */
-  lwgrp_ring ring;
-  lwgrp_logring logring;
-  lwgrp_ring_build_from_mpicomm(comm, &ring);
-  lwgrp_logring_build_from_mpicomm(comm, &logring);
+  lwgrp_comm lwgcomm;
+  lwgrp_comm_build_from_mpicomm(comm, &lwgcomm);
 
   /* TODO: incorporate scans to avoid this requirement */
   /* ensure all elements are unique */
@@ -761,23 +750,25 @@ int DTCMP_Sortv_cheng(
   MPI_Aint key_true_lb, key_true_extent;
   MPI_Type_get_true_extent(uniqkey, &key_true_lb, &key_true_extent);
 
+  /* get number of ranks */
+  int ranks;
+  lwgrp_comm_size(&lwgcomm, &ranks);
+
   /* hold key for each process representing exact splitter,
    * all items equal to or less than should be sent to corresponding proc */
-  void* splitters = dtcmp_malloc(group_ranks * key_true_extent, 0, __FILE__, __LINE__);
-  int*  valid     = dtcmp_malloc(group_ranks * sizeof(int), 0, __FILE__, __LINE__);
+  void* splitters = dtcmp_malloc(ranks * key_true_extent, 0, __FILE__, __LINE__);
+  int*  valid     = dtcmp_malloc(ranks * sizeof(int), 0, __FILE__, __LINE__);
 
   /* compute global split points across all data */
   find_exact_splitters(
     uniqbuf, count, uniqkey, uniqkeysat, uniqcmp, uniqhints,
-    THRESH, splitters, valid,
-    group_rank, group_ranks, &ring, &logring, comm
+    THRESH, splitters, valid, &lwgcomm
   );
 
   /* now split data, exchange, and merge */
   exact_split_exchange_merge(
     uniqbuf, count, uniqkey, uniqkeysat, uniqcmp, uniqhints,
-    splitters, valid,
-    group_rank, group_ranks, &ring, &logring, comm
+    splitters, valid, &lwgcomm
   );
 
   /* strip off extra data we attached to ensure items are unique */
@@ -789,9 +780,8 @@ int DTCMP_Sortv_cheng(
   dtcmp_free(&valid);
   dtcmp_free(&splitters);
 
-  /* free our ring and logring objects */
-  lwgrp_logring_free(&logring);
-  lwgrp_ring_free(&ring);
+  /* free our com objects */
+  lwgrp_comm_free(&lwgcomm);
 
   return 0;
 }
