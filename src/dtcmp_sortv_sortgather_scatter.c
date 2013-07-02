@@ -9,6 +9,7 @@
 
 #include "mpi.h"
 #include "dtcmp_internal.h"
+#include "lwgrp_comm.h"
 
 #define MIN (0)
 #define MAX (1)
@@ -38,7 +39,7 @@ typedef struct {
   int sorter;
   int sort_rank;
   int sort_ranks;
-  int* sort_group;
+  lwgrp_comm* sort_lwgcomm;
 } gather_scatter_state_t;
 
 static int dtcmp_sortv_max_gather(
@@ -326,24 +327,22 @@ int dtcmp_sortv_merge_tree(
     sort_ranks++;
   }
 
-  int* sort_group = NULL;
+  lwgrp_comm* sort_lwgcomm = NULL;
   if (sort_ranks > 0) {
     if (sorter) {
-#if 0
       /* build a group of sorters */
-      groupinfo sort;
-      sort.comm       = comm;
-      sort.comm_rank  = comm_rank;
-      sort.comm_left  = left_rank;
-      sort.comm_right = right_rank;
-      sort.group_rank = sort_rank;
-      sort.group_size = sort_ranks;
-#endif
-      sort_group = (int*) dtcmp_malloc(sort_ranks * sizeof(int), 0, __FILE__, __LINE__);
-      int i;
-      for (i = 0; i < sort_ranks; i++) {
-        sort_group[i] = i * block_size;
+      int left = MPI_PROC_NULL;
+      if (sort_rank > 0) {
+        left = (sort_rank - 1) * block_size;
       }
+      int right = MPI_PROC_NULL;
+      if (sort_rank < sort_ranks - 1) {
+        right = (sort_rank + 1) * block_size;
+      }
+      lwgrp_chain lwgchain;
+      lwgrp_chain_build_from_vals(comm, left, right, sort_ranks, sort_rank, &lwgchain);
+      lwgrp_comm_build_from_chain(&lwgchain, &sort_lwgcomm);
+      lwgrp_chain_free(&lwgchain);
     }
   }
 
@@ -358,7 +357,7 @@ int dtcmp_sortv_merge_tree(
   state->sorter     = sorter;
   state->sort_rank  = sort_rank;
   state->sort_ranks = sort_ranks;
-  state->sort_group = sort_group;
+  state->sort_lwgcomm = sort_lwgcomm;
 
   return DTCMP_SUCCESS;
 }
@@ -433,8 +432,10 @@ int dtcmp_sortv_scatter_tree(
   int remainder = count - final_count;
   DTCMP_Memcpy(outbuf, remainder, keysat, buf, remainder, keysat);
 
+  /* free our sort group */
+  lwgrp_comm_free(state->sort_lwgcomm);
+
   /* free memory */
-  dtcmp_free(&state->sort_group);
   dtcmp_free(&state->buf);
   dtcmp_free(&state->count_list);
 
@@ -477,9 +478,9 @@ int DTCMP_Sortv_sortgather_scatter(
 
   /* parallel sort over subset */
   if (state.sort_ranks > 1 && state.sorter) {
-    DTCMP_Sortv_ranklist_cheng(
+    DTCMP_Sortv_cheng_lwgrp(
       DTCMP_IN_PLACE, state.buf, state.count, key, keysat, cmp, hints,
-      state.sort_rank, state.sort_ranks, state.sort_group, comm
+      &(state.sort_lwgcomm)
     );
   }
 

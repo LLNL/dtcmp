@@ -94,7 +94,7 @@ int dtcmp_handle_free_uniqify(DTCMP_Handle* handle)
 int dtcmp_uniqify(
   const void* inbuf, int count, MPI_Datatype inkey, MPI_Datatype inkeysat, DTCMP_Op incmp, DTCMP_Flags inhints,
   void** outbuf, MPI_Datatype* outkey, MPI_Datatype* outkeysat, DTCMP_Op* outcmp, DTCMP_Flags* outhints,
-  MPI_Comm comm, DTCMP_Handle* handle)
+  int rank, DTCMP_Handle* handle)
 {
   /* TODO: with an allreduce and scan, we get total number of items,
    * and the offset of each of ours, then use this info to use one
@@ -135,10 +135,6 @@ int dtcmp_uniqify(
   dtcmp_handle_uniqify_t* values;
   size_t new_buf_size = count * elem_size;
   dtcmp_handle_alloc_uniqify(new_buf_size, &values, handle);
-
-  /* get our rank */
-  int rank;
-  MPI_Comm_rank(comm, &rank);
 
   /* copy (key,rank,index,keysat) into new buffer */
   int i;

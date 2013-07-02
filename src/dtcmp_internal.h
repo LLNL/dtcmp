@@ -15,6 +15,7 @@
 #include "mpi.h"
 #include "dtcmp.h"
 #include "dtcmp_ops.h"
+#include "lwgrp_comm.h"
 
 /* ---------------------------------------
  * Internal types
@@ -156,7 +157,7 @@ int dtcmp_sortz_to_sort(
 int dtcmp_uniqify(
   const void* buf, int count, MPI_Datatype key, MPI_Datatype keysat, DTCMP_Op cmp, DTCMP_Flags hints,
   void** outbuf, MPI_Datatype* outkey, MPI_Datatype* outkeysat, DTCMP_Op* outcmp, DTCMP_Flags* outhints,
-  MPI_Comm comm, DTCMP_Handle* uniqhandle
+  int rank, DTCMP_Handle* uniqhandle
 );
 
 int dtcmp_deuniqify(
@@ -497,6 +498,17 @@ int DTCMP_Sortv_cheng(
   DTCMP_Op cmp,
   DTCMP_Flags hints,
   MPI_Comm comm
+);
+
+int DTCMP_Sortv_cheng_lwgrp(
+  const void* inbuf,
+  void* outbuf,
+  int count,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  lwgrp_comm* comm
 );
 
 /* ---------------------------------------

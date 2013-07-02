@@ -682,7 +682,7 @@ static int exact_split_exchange_merge(
   return DTCMP_SUCCESS;
 }
 
-int DTCMP_Sortv_cheng(
+int DTCMP_Sortv_cheng_lwgrp(
   const void* inbuf,
   void* outbuf,
   int count,
@@ -690,7 +690,7 @@ int DTCMP_Sortv_cheng(
   MPI_Datatype keysat,
   DTCMP_Op cmp,
   DTCMP_Flags hints,
-  MPI_Comm comm)
+  lwgrp_comm* lwgcomm)
 {
   /* algorithm
    * 1) sort local data
@@ -700,9 +700,21 @@ int DTCMP_Sortv_cheng(
    * 4) send data to final process with alltoall/alltoallv
    * 5) merge data into final sorted order */
 
-  /* create ring and logring from our ranklist */
-  lwgrp_comm lwgcomm;
-  lwgrp_comm_build_from_mpicomm(comm, &lwgcomm);
+  /* get our rank and number of ranks */
+  int rank, ranks;
+  lwgrp_comm_size(&lwgcomm, &rank);
+  lwgrp_comm_size(&lwgcomm, &ranks);
+
+  /* TODO: create group of tasks with non-zero counts */
+#if 0
+  int bin = -1;
+  if (count > 0) {
+    bin = 0;
+  }
+  lwgrp_comm_split_bin(&lwgcomm, 2, bin, &newcomm);
+  // check that newcomm has some ranks
+  lwgrp_comm_free(&newcomm);
+#endif
 
   /* TODO: incorporate scans to avoid this requirement */
   /* ensure all elements are unique */
@@ -739,7 +751,7 @@ int DTCMP_Sortv_cheng(
     dtcmp_uniqify(
       tmpbuf, count, key, keysat, cmp, hints,
       &uniqbuf, &uniqkey, &uniqkeysat, &uniqcmp, &uniqhints,
-      comm, &uniqhandle
+      rank, &uniqhandle
     );
   }
 
@@ -750,10 +762,6 @@ int DTCMP_Sortv_cheng(
   MPI_Aint key_true_lb, key_true_extent;
   MPI_Type_get_true_extent(uniqkey, &key_true_lb, &key_true_extent);
 
-  /* get number of ranks */
-  int ranks;
-  lwgrp_comm_size(&lwgcomm, &ranks);
-
   /* hold key for each process representing exact splitter,
    * all items equal to or less than should be sent to corresponding proc */
   void* splitters = dtcmp_malloc(ranks * key_true_extent, 0, __FILE__, __LINE__);
@@ -762,13 +770,13 @@ int DTCMP_Sortv_cheng(
   /* compute global split points across all data */
   find_exact_splitters(
     uniqbuf, count, uniqkey, uniqkeysat, uniqcmp, uniqhints,
-    THRESH, splitters, valid, &lwgcomm
+    THRESH, splitters, valid, lwgcomm
   );
 
   /* now split data, exchange, and merge */
   exact_split_exchange_merge(
     uniqbuf, count, uniqkey, uniqkeysat, uniqcmp, uniqhints,
-    splitters, valid, &lwgcomm
+    splitters, valid, lwgcomm
   );
 
   /* strip off extra data we attached to ensure items are unique */
@@ -780,8 +788,30 @@ int DTCMP_Sortv_cheng(
   dtcmp_free(&valid);
   dtcmp_free(&splitters);
 
-  /* free our com objects */
+  return DTCMP_SUCCESS;
+}
+
+int DTCMP_Sortv_cheng(
+  const void* inbuf,
+  void* outbuf,
+  int count,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Comm comm)
+{
+  /* create ring and logring from our ranklist */
+  lwgrp_comm lwgcomm;
+  lwgrp_comm_build_from_mpicomm(comm, &lwgcomm);
+
+  /* delegate to function using lwgroup */
+  int rc = DTCMP_Sortv_cheng_lwgrp(
+    inbuf, outbuf, count, key, keysat, cmp, hints, &lwgcomm
+  );
+
+  /* free our comm object */
   lwgrp_comm_free(&lwgcomm);
 
-  return 0;
+  return rc;
 }

@@ -299,7 +299,7 @@ int DTCMP_Sortz_samplesort(
     dtcmp_uniqify(
       inbuf, incount, key, keysat, cmp, hints,
       &uniqbuf, &uniqkey, &uniqkeysat, &uniqcmp, &uniqhints,
-      comm, &uniqhandle
+      rank, &uniqhandle
     );
   }
 
