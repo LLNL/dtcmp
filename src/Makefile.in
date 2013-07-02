@@ -101,7 +101,6 @@ am_libdtcmp_la_OBJECTS = libdtcmp_la-dtcmp.lo \
 	libdtcmp_la-dtcmp_sortv_allgather.lo \
 	libdtcmp_la-dtcmp_sortv_sortgather_scatter.lo \
 	libdtcmp_la-dtcmp_sortv_cheng.lo \
-	libdtcmp_la-dtcmp_sortv_ranklist_cheng.lo \
 	libdtcmp_la-dtcmp_sortz_samplesort.lo \
 	libdtcmp_la-dtcmp_rankv_sort.lo
 libdtcmp_la_OBJECTS = $(am_libdtcmp_la_OBJECTS)
@@ -321,7 +320,6 @@ libdtcmp_la_SOURCES = \
   dtcmp_sortv_allgather.c \
   dtcmp_sortv_sortgather_scatter.c \
   dtcmp_sortv_cheng.c \
-  dtcmp_sortv_ranklist_cheng.c \
   dtcmp_sortz_samplesort.c \
   dtcmp_rankv_sort.c
 
@@ -425,7 +423,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_sort_samplesort.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_sortv_allgather.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_sortv_cheng.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_sortv_ranklist_cheng.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_sortv_sortgather_scatter.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_sortz_samplesort.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_uniqify.Plo@am__quote@
@@ -626,13 +623,6 @@ libdtcmp_la-dtcmp_sortv_cheng.lo: dtcmp_sortv_cheng.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='dtcmp_sortv_cheng.c' object='libdtcmp_la-dtcmp_sortv_cheng.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libdtcmp_la_CFLAGS) $(CFLAGS) -c -o libdtcmp_la-dtcmp_sortv_cheng.lo `test -f 'dtcmp_sortv_cheng.c' || echo '$(srcdir)/'`dtcmp_sortv_cheng.c
-
-libdtcmp_la-dtcmp_sortv_ranklist_cheng.lo: dtcmp_sortv_ranklist_cheng.c
-@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libdtcmp_la_CFLAGS) $(CFLAGS) -MT libdtcmp_la-dtcmp_sortv_ranklist_cheng.lo -MD -MP -MF $(DEPDIR)/libdtcmp_la-dtcmp_sortv_ranklist_cheng.Tpo -c -o libdtcmp_la-dtcmp_sortv_ranklist_cheng.lo `test -f 'dtcmp_sortv_ranklist_cheng.c' || echo '$(srcdir)/'`dtcmp_sortv_ranklist_cheng.c
-@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/libdtcmp_la-dtcmp_sortv_ranklist_cheng.Tpo $(DEPDIR)/libdtcmp_la-dtcmp_sortv_ranklist_cheng.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='dtcmp_sortv_ranklist_cheng.c' object='libdtcmp_la-dtcmp_sortv_ranklist_cheng.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libdtcmp_la_CFLAGS) $(CFLAGS) -c -o libdtcmp_la-dtcmp_sortv_ranklist_cheng.lo `test -f 'dtcmp_sortv_ranklist_cheng.c' || echo '$(srcdir)/'`dtcmp_sortv_ranklist_cheng.c
 
 libdtcmp_la-dtcmp_sortz_samplesort.lo: dtcmp_sortz_samplesort.c
 @am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libdtcmp_la_CFLAGS) $(CFLAGS) -MT libdtcmp_la-dtcmp_sortz_samplesort.lo -MD -MP -MF $(DEPDIR)/libdtcmp_la-dtcmp_sortz_samplesort.Tpo -c -o libdtcmp_la-dtcmp_sortz_samplesort.lo `test -f 'dtcmp_sortz_samplesort.c' || echo '$(srcdir)/'`dtcmp_sortz_samplesort.c
