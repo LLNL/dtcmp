@@ -341,7 +341,8 @@ int dtcmp_sortv_merge_tree(
       }
       lwgrp_chain lwgchain;
       lwgrp_chain_build_from_vals(comm, left, right, sort_ranks, sort_rank, &lwgchain);
-      lwgrp_comm_build_from_chain(&lwgchain, &sort_lwgcomm);
+      sort_lwgcomm = dtcmp_malloc(sizeof(lwgrp_comm), 0, __FILE__, __LINE__);
+      lwgrp_comm_build_from_chain(&lwgchain, sort_lwgcomm);
       lwgrp_chain_free(&lwgchain);
     }
   }
@@ -434,6 +435,7 @@ int dtcmp_sortv_scatter_tree(
 
   /* free our sort group */
   lwgrp_comm_free(state->sort_lwgcomm);
+  dtcmp_free(&state->sort_lwgcomm);
 
   /* free memory */
   dtcmp_free(&state->buf);
@@ -480,7 +482,7 @@ int DTCMP_Sortv_sortgather_scatter(
   if (state.sort_ranks > 1 && state.sorter) {
     DTCMP_Sortv_cheng_lwgrp(
       DTCMP_IN_PLACE, state.buf, state.count, key, keysat, cmp, hints,
-      &(state.sort_lwgcomm)
+      state.sort_lwgcomm
     );
   }
 

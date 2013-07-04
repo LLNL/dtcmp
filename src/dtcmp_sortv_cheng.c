@@ -34,6 +34,7 @@
 #define LT (0)
 #define EQ (1)
 
+#if (MPI_VERSION >= 2 && MPI_SUBVERSION >= 2) || (MPI_VERSION >= 3)
 /* when we compute the weighted median, we may get some median values
  * that have a zero count.  We should avoid calling the compare function
  * for these medians, as the actual value may be garbage, which may crash
@@ -681,6 +682,7 @@ static int exact_split_exchange_merge(
 
   return DTCMP_SUCCESS;
 }
+#endif /* MPI >= 2.2 */
 
 int DTCMP_Sortv_cheng_lwgrp(
   const void* inbuf,
@@ -690,8 +692,14 @@ int DTCMP_Sortv_cheng_lwgrp(
   MPI_Datatype keysat,
   DTCMP_Op cmp,
   DTCMP_Flags hints,
-  lwgrp_comm* lwgcomm)
+  const lwgrp_comm* lwgcomm)
 {
+#if (MPI_VERSION < 2) || (MPI_VERSION == 2 && MPI_SUBVERSION < 2)
+  /* print a nicer message later, but for now just bail... */
+  MPI_Abort(MPI_COMM_WORLD, 1);
+  return DTCMP_FAILURE;
+#else
+
   /* algorithm
    * 1) sort local data
    * 2) find P exact splitters using median-of-medians method
@@ -702,8 +710,8 @@ int DTCMP_Sortv_cheng_lwgrp(
 
   /* get our rank and number of ranks */
   int rank, ranks;
-  lwgrp_comm_size(&lwgcomm, &rank);
-  lwgrp_comm_size(&lwgcomm, &ranks);
+  lwgrp_comm_size(lwgcomm, &rank);
+  lwgrp_comm_size(lwgcomm, &ranks);
 
   /* TODO: create group of tasks with non-zero counts */
 #if 0
@@ -711,7 +719,7 @@ int DTCMP_Sortv_cheng_lwgrp(
   if (count > 0) {
     bin = 0;
   }
-  lwgrp_comm_split_bin(&lwgcomm, 2, bin, &newcomm);
+  lwgrp_comm_split_bin(lwgcomm, 2, bin, &newcomm);
   // check that newcomm has some ranks
   lwgrp_comm_free(&newcomm);
 #endif
@@ -789,6 +797,7 @@ int DTCMP_Sortv_cheng_lwgrp(
   dtcmp_free(&splitters);
 
   return DTCMP_SUCCESS;
+#endif
 }
 
 int DTCMP_Sortv_cheng(
@@ -801,6 +810,12 @@ int DTCMP_Sortv_cheng(
   DTCMP_Flags hints,
   MPI_Comm comm)
 {
+#if (MPI_VERSION < 2) || (MPI_VERSION == 2 && MPI_SUBVERSION < 2)
+  /* print a nicer message later, but for now just bail... */
+  MPI_Abort(MPI_COMM_WORLD, 1);
+  return DTCMP_FAILURE;
+#else
+
   /* create ring and logring from our ranklist */
   lwgrp_comm lwgcomm;
   lwgrp_comm_build_from_mpicomm(comm, &lwgcomm);
@@ -814,4 +829,5 @@ int DTCMP_Sortv_cheng(
   lwgrp_comm_free(&lwgcomm);
 
   return rc;
+#endif
 }

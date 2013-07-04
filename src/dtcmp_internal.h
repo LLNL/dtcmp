@@ -508,7 +508,7 @@ int DTCMP_Sortv_cheng_lwgrp(
   MPI_Datatype keysat,
   DTCMP_Op cmp,
   DTCMP_Flags hints,
-  lwgrp_comm* comm
+  const lwgrp_comm* comm
 );
 
 /* ---------------------------------------
