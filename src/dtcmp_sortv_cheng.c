@@ -710,7 +710,7 @@ int DTCMP_Sortv_cheng_lwgrp(
 
   /* get our rank and number of ranks */
   int rank, ranks;
-  lwgrp_comm_size(lwgcomm, &rank);
+  lwgrp_comm_rank(lwgcomm, &rank);
   lwgrp_comm_size(lwgcomm, &ranks);
 
   /* TODO: create group of tasks with non-zero counts */
