@@ -1270,7 +1270,6 @@ int DTCMP_Sortv(
     );
   }
 
-#if (MPI_VERSION >= 2 && MPI_SUBVERSION >= 2) || (MPI_VERSION >= 3)
   /* pick algorithm based on number of elements */
   if (sum <= DTCMP_SORTV_THRESHOLD_ALLGATHER) {
     /* if sum is small gather to each task and sort locally */
@@ -1289,14 +1288,6 @@ int DTCMP_Sortv(
       key, keysat, cmp, hints, comm
     );
   }
-#else
-    /* need MPI_Reduce_local for Sortv_cheng/sortgather_scatter */
-    /* TODO: call samplesort */
-    return DTCMP_Sortv_allgather(
-      inbuf, outbuf, count,
-      key, keysat, cmp, hints, comm
-    );
-#endif
 }
 
 int DTCMP_Sortz(
