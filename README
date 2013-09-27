@@ -204,6 +204,18 @@ algorithm like the following:
 
 6) use copy of string, new type, and new op in any DTCMP calls
 
+7) free op and type
+
+Since this use case is common, DTCMP includes two functions that package
+steps 1, 4, and 5 above into a single routine:
+
+DTCMP_Str_create_ascend
+DTCMP_Str_create_descend
+
+Given the number of characters in a fixed-length string, each function
+returns a committed MPI_Datatype and a newly created DTCMP_Op bound to
+strcmp.
+
 TODO:
 Add mechanism to provide assertions in API:
   sorted (locally & globally) - done
