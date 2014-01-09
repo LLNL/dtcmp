@@ -59,6 +59,7 @@ AC_C_BIGENDIAN
 AC_CONFIG_FILES([ \
   Makefile \
   src/Makefile \
+  libdtcmp.pc \
 ])
 AC_OUTPUT
 

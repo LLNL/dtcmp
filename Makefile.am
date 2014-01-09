@@ -4,3 +4,6 @@ SUBDIRS = src
 EXTRA_DIST = 
 
 dist_pkgdata_DATA = README LICENSE.TXT
+
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = libdtcmp.pc
