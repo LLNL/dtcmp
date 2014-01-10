@@ -9,7 +9,7 @@
 
 #include "mpi.h"
 #include "dtcmp_internal.h"
-#include "lwgrp_comm.h"
+#include "lwgrp.h"
 
 #define MIN (0)
 #define MAX (1)

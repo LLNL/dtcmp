@@ -15,7 +15,7 @@
 #include "mpi.h"
 #include "dtcmp.h"
 #include "dtcmp_ops.h"
-#include "lwgrp_comm.h"
+#include "lwgrp.h"
 
 /* ---------------------------------------
  * Internal types
