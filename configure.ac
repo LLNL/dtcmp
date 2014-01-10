@@ -1,12 +1,11 @@
 ##
 # Prologue.
 ##
-AC_INIT
-AC_CONFIG_SRCDIR([src/dtcmp.c])
+AC_INIT([Datatype Comparison Library],[1.0.1],[],[dtcmp],[https://github.com/hpc/dtcmp])
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR([m4])
-
-AM_CONFIG_HEADER([config/config.h])
+AC_CONFIG_HEADERS([config/config.h])
+AC_CONFIG_SRCDIR([src/dtcmp.c])
 
 #AC_CANONICAL_SYSTEM
 
@@ -16,7 +15,7 @@ X_AC_EXPAND_INSTALL_DIRS
 ##
 # Automake support.
 ##
-AM_INIT_AUTOMAKE([$META_NAME], [$META_VERSION]-[$META_RELEASE])
+AM_INIT_AUTOMAKE([foreign])
 
 #AM_MAINTAINER_MODE
 
