@@ -7,6 +7,10 @@
  * For details, see https://github.com/hpc/dtcmp
  * Please also read this file: LICENSE.TXT. */
 
+//  use mvapich2-gnu-1.9
+//  setenv LD_LIBRARY_PATH "../../lwgrp.git/install_mvapich2/lib:../install/lib"
+//  mpicc -g -O0 -o main main.c -I../../lwgrp.git/install_mvapich2/include -L../../lwgrp.git/install_mvapich2/lib -L../install/lib -ldtcmp -llwgrp
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -45,6 +49,26 @@ int main(int argc, char* argv[])
   }
   size = rank;
 #endif
+
+  unsigned long long int scanbuf[SIZE];
+  int valbuf[SIZE];
+  int ltrbuf[SIZE];
+  int rtlbuf[SIZE];
+  for (i = 0; i < SIZE; i++) {
+    scanbuf[i] = (rank * SIZE + i) / 10;
+    valbuf[i]  = 1;
+    ltrbuf[i]  = 0;
+    rtlbuf[i]  = 0;
+  }
+
+  int scansize = SIZE;
+  if (rank == 1) scansize = 0;
+  DTCMP_Segmented_exscan(
+    scansize, scanbuf, MPI_UNSIGNED_LONG_LONG,
+    valbuf, ltrbuf, rtlbuf, MPI_INT,
+    DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE,
+    MPI_SUM, MPI_COMM_WORLD
+  );
 
 //  DTCMP_Sortv(inbuf, outbuf, size, MPI_INT, MPI_INT, DTCMP_OP_INT_DESCEND, MPI_COMM_WORLD);
   //DTCMP_Sort_local(inbuf, outbuf, size, MPI_INT, MPI_INT, DTCMP_OP_INT_DESCEND);

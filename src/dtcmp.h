@@ -732,6 +732,24 @@ int DTCMP_Rankv_strings(
                            *       rank (handle) */
 );
 
+/* ----------------------------------------------
+ * Segmented scan
+ * ---------------------------------------------- */
+
+int DTCMP_Segmented_exscan(
+  int count,
+  const void* keybuf,
+  MPI_Datatype key,
+  const void* valbuf,
+  void* ltrbuf,
+  void* rtlbuf,
+  MPI_Datatype val,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Op op,
+  MPI_Comm comm
+);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

@@ -47,7 +47,8 @@ libdtcmp_la_SOURCES = \
   dtcmp_sortv_sortgather_scatter.c \
   dtcmp_sortv_cheng.c \
   dtcmp_sortz_samplesort.c \
-  dtcmp_rankv_sort.c
+  dtcmp_rankv_sort.c \
+  dtcmp_seg_exscan.c
 libdtcmp_la_CFLAGS = $(INCLUDES)
 libdtcmp_la_LIBADD = $(LWGRP_LDFLAGS) $(LWGRP_LIBS)
 libdtcmp_la_LDFLAGS = -avoid-version
