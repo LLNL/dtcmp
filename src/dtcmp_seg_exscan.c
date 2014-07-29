@@ -15,263 +15,14 @@
 #define DETECT_VALID (1)
 
 #define ASSIGN_VALID  (0)
-#define ASSIGN_FLAG   (1)
+#define ASSIGN_STOP   (1)
 #define ASSIGN_NEXT   (2)
 
-/* computes first-in-group and last-in-group flags for each local item,
- * disregarding first-in-group for first item and last-in-group for
- * last item since those can be affected by items on other procs,
- * we do this separately from detect_edges to (eventually) reuse code
- * for Rank_local */
-static int detect_edges_interior(
-  const void* buf,
-  int num,
-  MPI_Datatype item,
-  DTCMP_Op cmp,
-  DTCMP_Flags hints,
-  int first_in_group[],
-  int last_in_group[])
-{
-  /* get extent of item */
-  MPI_Aint lb, extent;
-  MPI_Type_get_extent(item, &lb, &extent);
-
-  /* we can directly compute the edges for all elements but the endpoints */
-  int i;
-  const char* left_data  = (const char*)buf;
-  const char* right_data = (const char*)buf + extent;
-  for (i = 1; i < num; i++) {
-    int result = dtcmp_op_eval(left_data, right_data, cmp);
-    if (result != 0) {
-      /* the left item is different from the right item,
-       * mark the right item as the leader of a new group,
-       * and mark the left as the last of its group */
-      first_in_group[i]  = 1;
-      last_in_group[i-1] = 1;
-    } else {
-      /* the items are equal, so the right is not the start of a group,
-       * nor is the left the end of a group */
-      first_in_group[i]  = 0;
-      last_in_group[i-1] = 0;
-    }
-
-    /* point to the next element */
-    left_data = right_data;
-    right_data += extent;
-  }
-
-  return DTCMP_SUCCESS;
-}
-
-static int detect_edges(
-  const void* buf,
-  int num,
-  MPI_Datatype item,
-  DTCMP_Op cmp,
-  DTCMP_Flags hints,
-  int first_in_group[],
-  int last_in_group[],
-  MPI_Comm comm)
-{
-  /* if every process has at least one item, we'd just need to send values
-   * to the ranks to our left and right sides O(1), but since
-   * some ranks may not have any items, we must execute a double scan
-   * instead O(log N) */
-
-  /* get our rank and number of ranks in the communicator */
-  int rank, ranks;
-  MPI_Comm_rank(comm, &rank);
-  MPI_Comm_size(comm, &ranks);
-
-  /* get extent of item */
-  MPI_Aint lb, extent;
-  MPI_Type_get_extent(item, &lb, &extent);
-
-  /* get true extent of item */
-  MPI_Aint true_lb, true_extent;
-  MPI_Type_get_true_extent(item, &true_lb, &true_extent);
-
-  /* compute the size of the scan item, we'll send the rank the
-   * process should exchange data with in the next round,
-   * a flag to indicate whether the item is valid, and the item itself */
-  size_t scan_buf_size = 2 * sizeof(int) + true_extent;
-
-  /* build type for exchange */
-  MPI_Datatype type_item;
-  MPI_Datatype types[3];
-  types[0] = MPI_INT;
-  types[1] = MPI_INT;
-  types[2] = item;
-  dtcmp_type_concat(3, types, &type_item);
-
-  /* declare pointers to our scan buffers */
-  char* recv_left_buf  = dtcmp_malloc(scan_buf_size, 0, __FILE__, __LINE__);
-  char* recv_right_buf = dtcmp_malloc(scan_buf_size, 0, __FILE__, __LINE__);
-  char* send_left_buf  = dtcmp_malloc(scan_buf_size, 0, __FILE__, __LINE__);
-  char* send_right_buf = dtcmp_malloc(scan_buf_size, 0, __FILE__, __LINE__);
-
-  /* we can directly compute the edges for all elements but the endpoints */
-  detect_edges_interior(buf, num, item, cmp, hints, first_in_group, last_in_group);
-
-  /* to compute the edges for our endpoints we use left-to-right and
-   * right-to-left scan operations -- we can't just do point-to-point
-   * with our left and right neighbors because our left and/or right
-   * neighbor may not have any elements */
-
-  /* for the scan element, we specify:
-   *   (int)  a flag indicating whether the element value is valid,
-   *   (size) a copy of the element
-   * Note that the next rank with the element and the next rank for
-   * communication may be different since some ranks may not have a value. */
-
-  /* to compute the leader flag for the leftmost element,
-   * we execute a left-to-right scan */
-  int* send_left_ints  = (int*) (send_left_buf);
-  int* send_right_ints = (int*) (send_right_buf);
-  int* recv_left_ints  = (int*) (recv_left_buf);
-  int* recv_right_ints = (int*) (recv_right_buf);
-
-  /* get pointers to first and last items in buffer */
-  char* buf_first = (char*)buf;
-  char* buf_last  = (char*)buf + (num-1) * extent;
-
-  /* copy the value from our rightmost element into our left-to-right
-   * scan buffer assume that we don't have a valid value */
-  send_left_ints[DETECT_VALID]  = 0;
-  send_right_ints[DETECT_VALID] = 0;
-  if (true_extent > 0 && num > 0) {
-    /* copy value from our leftmost element into right-to-left scan buffer */
-    send_left_ints[DETECT_VALID] = 1;
-    DTCMP_Memcpy(send_left_buf + 2 * sizeof(int), 1, item, buf_first, 1, item);
-
-    /* copy value from our rightmost element into left-to-right scan buffer */
-    send_right_ints[DETECT_VALID] = 1;
-    DTCMP_Memcpy(send_right_buf + 2 * sizeof(int), 1, item, buf_last, 1, item);
-  }
-
-  int left_rank = rank - 1;
-  if (left_rank < 0) {
-    left_rank = MPI_PROC_NULL;
-  }
-  int right_rank = rank + 1;
-  if (right_rank >= ranks) {
-    right_rank = MPI_PROC_NULL;
-  }
-
-  /* execute left-to-right and right-to-left scans */
-  MPI_Request request[4];
-  MPI_Status  status[4];
-  int made_left_comparison  = 0;
-  int made_right_comparison = 0;
-  while (left_rank != MPI_PROC_NULL || right_rank != MPI_PROC_NULL) {
-    int k = 0;
-
-    /* if we have a left partner, send him our left-going data
-     * and recv his right-going data */
-    if (left_rank != MPI_PROC_NULL) {
-      /* receive right-going data from the left */
-      MPI_Irecv(recv_left_buf, 1, type_item, left_rank, 0, comm, &request[k]);
-      k++;
-
-      /* inform rank to our left of the rank on our right,
-       * and send him our data */
-      send_left_ints[DETECT_NEXT] = right_rank;
-      MPI_Isend(send_left_buf, 1, type_item, left_rank, 0, comm, &request[k]);
-      k++;
-    }
-
-    /* if we have a right partner, send him our right-going data
-     * and recv his left-going data */
-    if (right_rank != MPI_PROC_NULL) {
-      /* receive left-going data from the right */
-      MPI_Irecv(recv_right_buf, 1, type_item, right_rank, 0, comm, &request[k]);
-      k++;
-
-      /* inform rank to our right of the rank on our left,
-       * and send him our data */
-      send_right_ints[DETECT_NEXT] = left_rank;
-      MPI_Isend(send_right_buf, 1, type_item, right_rank, 0, comm, &request[k]);
-      k++;
-    }
-
-    /* wait for all communication to complete */
-    if (k > 0) {
-      MPI_Waitall(k, request, status);
-    }
-
-    /* if we have a left partner, merge his data with our right-going data */
-    if (left_rank != MPI_PROC_NULL) {
-      if (true_extent > 0 && num > 0 && !made_left_comparison && recv_left_ints[DETECT_VALID]) {
-        /* compare our leftmost value with the value we receive from the left,
-         * if our value is different, mark it as the start of a new group */
-        int result = dtcmp_op_eval(recv_left_buf + 2 * sizeof(int), buf_first, cmp);
-        if (result != 0) {
-          first_in_group[0] = 1;
-        } else {
-          first_in_group[0] = 0;
-        }
-
-        /* after we make this comparison, we don't need to again,
-         * we just need to check with the first rank to our left
-         * that has a valid value */
-        made_left_comparison = 1;
-      }
-
-      /* get the next rank to send to on our left */
-      left_rank = recv_left_ints[DETECT_NEXT];
-    }
-
-    /* if we have a right partner, merge his data with our left-going data */
-    if (right_rank != MPI_PROC_NULL) {
-      if (true_extent > 0 && num > 0 && !made_right_comparison && recv_right_ints[DETECT_VALID]) {
-        /* compare our rightmost value with the value we receive from the right,
-         * if our value is different, mark it as the end of a group */
-        int result = dtcmp_op_eval(recv_right_buf + 2 * sizeof(int), buf_last, cmp);
-        if (result != 0) {
-          last_in_group[num-1] = 1;
-        } else {
-          last_in_group[num-1] = 0;
-        }
-        made_right_comparison = 1;
-      }
-
-      /* get the next rank to send to on our right */
-      right_rank = recv_right_ints[DETECT_NEXT];
-    }
-  }
-
-  /* if we have an element but never made a comparison on one side,
-   * our element is the first or last in its group */
-  if (num > 0) {
-    /* if we never made a comparison on the left,
-     * there is no value to our left, so our leftmost item is the first */
-    if (! made_left_comparison) {
-      first_in_group[0] = 1;
-    }
-
-    /* if we never made a comparison on the right, 
-     * there is no value to our right, so our rightmost item is the last */
-    if (! made_right_comparison) {
-      last_in_group[num-1] = 1;
-    }
-  }
-
-  /* free our temporary data */
-  dtcmp_free(&send_right_buf);
-  dtcmp_free(&send_left_buf);
-  dtcmp_free(&recv_right_buf);
-  dtcmp_free(&recv_left_buf);
-
-  MPI_Type_free(&type_item);
-
-  return DTCMP_SUCCESS;
-}
-
 /* Executes a segmented exclusive scan on items in buf.
- * Executes specified MPI operation on satellite data
- * for items whose keys are equal.  Overwrites satellite
- * data with result. Items are assumed to be in sorted
- * order. */
+ * Executes specified MPI operation on value data
+ * for items whose keys are equal.  Stores result in left-to-right
+ * scan in ltrbuf and result of right-to-left scan in rtlbuf.
+ * Items must be in sorted order. */
 int DTCMP_Segmented_exscan(
   int count,
   const void* keybuf,
@@ -287,20 +38,6 @@ int DTCMP_Segmented_exscan(
 {
   int i, tmp_rc;
   int rc = DTCMP_SUCCESS;
-
-  /* build items to be sorted with return address */
-  int*  first_in_group = dtcmp_malloc(count * sizeof(int), 0, __FILE__, __LINE__);
-  int*  last_in_group  = dtcmp_malloc(count * sizeof(int), 0, __FILE__, __LINE__);
-
-  /* detect edges across sorted items, note we pass in the full items,
-   * which includes (key,rank,index) but we just use the key cmp operation */
-  tmp_rc = detect_edges(
-    keybuf, count, key, cmp, hints,
-    first_in_group, last_in_group, comm
-  );
-  if (tmp_rc != DTCMP_SUCCESS) {
-    rc = tmp_rc;
-  }
 
   /* get our rank and number of ranks in the communicator */
   int rank, ranks;
@@ -331,7 +68,7 @@ int DTCMP_Segmented_exscan(
 
   /* get true extent of val type */
   MPI_Aint val_true_lb, val_true_extent;
-  MPI_Type_get_extent(val, &val_true_lb, &val_true_extent);
+  MPI_Type_get_true_extent(val, &val_true_lb, &val_true_extent);
 
   /* compute the size of the scan item, we'll send a flag indicating
    * whether the value is valid, a flag indicating whether the value
@@ -376,59 +113,6 @@ int DTCMP_Segmented_exscan(
   char* scan_rtl_low_val  = (char*)scan_rtl_low  + 3 * sizeof(int) + key_true_extent;
   char* scan_rtl_high_val = (char*)scan_rtl_high + 3 * sizeof(int) + key_true_extent;
 
-  /* we assume we do not start a new group */
-  scan_ltr_high_ints[ASSIGN_FLAG] = 0;
-  scan_rtl_high_ints[ASSIGN_FLAG] = 0;
-
-  /* run through the elements we have locally and prepare
-   * our left-to-right and right-to-left scan items */
-  for (i = 0; i < count; i++) {
-    /* get pointer to current value in user's input buffer */
-    char* inval = (char*)valbuf + i * val_extent;
-    if (first_in_group[i]) {
-      /* left edge of new group, set flag */
-      scan_ltr_high_ints[ASSIGN_FLAG] = 1;
-
-      /* copy user data into high buf */
-      DTCMP_Memcpy(scan_ltr_high_val, 1, val, inval, 1, val);
-    } else {
-      /* item is not the start of a new group */
-      if (i > 0) {
-        /* accumulate user's input in high buffer,
-         * current = temp + current (keep order) */
-        DTCMP_Memcpy(scan_tmp_val, 1, val, inval, 1, val);
-        MPI_Reduce_local(scan_ltr_high_val, scan_tmp_val, 1, val, op);
-        DTCMP_Memcpy(scan_ltr_high_val, 1, val, scan_tmp_val, 1, val);
-      } else {
-        /* copy first item into high buffer */
-        DTCMP_Memcpy(scan_ltr_high_val, 1, val, inval, 1, val);
-      }
-    }
-
-    /* get pointer to current value in user's input buffer */
-    int j = count - 1 - i;
-    char* endval = (char*)valbuf + j * val_extent;
-    if (last_in_group[j]) {
-      /* right edge of new group, set flag */
-      scan_rtl_high_ints[ASSIGN_FLAG] = 1;
-
-      /* copy user data into high buf */
-      DTCMP_Memcpy(scan_rtl_high_val, 1, val, endval, 1, val);
-    } else {
-      /* item is not the start of a new group */
-      if (i > 0) {
-        /* accumulate user's input in high buffer,
-         * current = temp + current (keep order) */
-        DTCMP_Memcpy(scan_tmp_val, 1, val, endval, 1, val);
-        MPI_Reduce_local(scan_rtl_high_val, scan_tmp_val, 1, val, op);
-        DTCMP_Memcpy(scan_rtl_high_val, 1, val, scan_tmp_val, 1, val);
-      } else {
-        /* copy first item into high buffer */
-        DTCMP_Memcpy(scan_rtl_high_val, 1, val, endval, 1, val);
-      }
-    }
-  }
-
   /* our low values aren't valid unless we receive a valid message */
   scan_ltr_low_ints[ASSIGN_VALID] = 0;
   scan_rtl_low_ints[ASSIGN_VALID] = 0;
@@ -448,6 +132,87 @@ int DTCMP_Segmented_exscan(
     /* copy key of first item into right-to-left scan message */
     char* firstkey = (char*)keybuf;
     DTCMP_Memcpy(scan_rtl_high_key, 1, key, firstkey, 1, key);
+  }
+
+  /* we assume we do not start a new group */
+  scan_ltr_high_ints[ASSIGN_STOP] = 0;
+  scan_rtl_high_ints[ASSIGN_STOP] = 0;
+
+  /* run through the elements we have locally and prepare
+   * our left-to-right and right-to-left scan items */
+
+  /* initialize our scan values with our first value, if one exists */
+  if (count > 0) {
+      char* leftval  = (char*)valbuf;
+      char* rightval = (char*)valbuf + (count - 1) * val_extent;
+      DTCMP_Memcpy(scan_ltr_high_val, 1, val, leftval,  1, val);
+      DTCMP_Memcpy(scan_rtl_high_val, 1, val, rightval, 1, val);
+  }
+
+  /* accumulate values in high buffers */
+  for (i = 1; i < count; i++) {
+    /* determine whether current ltr item is in same group as
+     * previous ltr item */
+    int first_in_group = 0;
+    char* prevkey = (char*)keybuf + (i - 1) * key_extent;
+    char* currkey = (char*)keybuf + (i + 0) * key_extent;
+    int result = dtcmp_op_eval(prevkey, currkey, cmp);
+    if (result != 0) {
+      /* the current item is different from the previous item,
+       * so the current item is the start of a new group */
+      first_in_group = 1;
+    }
+    
+    /* either reset ltr value or accumulate current value
+     * with running total depending on whether current item
+     * starts a new group or not */
+    char* currval = (char*)valbuf + i * val_extent;
+    if (first_in_group) {
+      /* left edge of new group, set stop flag */
+      scan_ltr_high_ints[ASSIGN_STOP] = 1;
+
+      /* reset accumulator with current value */
+      DTCMP_Memcpy(scan_ltr_high_val, 1, val, currval, 1, val);
+    } else {
+      /* item is not the start of a new group,
+       * accumulate user's input in high buffer,
+       * current = temp + current (keep order) */
+      DTCMP_Memcpy(scan_tmp_val, 1, val, currval, 1, val);
+      MPI_Reduce_local(scan_ltr_high_val, scan_tmp_val, 1, val, op);
+      DTCMP_Memcpy(scan_ltr_high_val, 1, val, scan_tmp_val, 1, val);
+    }
+
+    /* determine whether current rtl item is in same group as
+     * previous rtl item */
+    first_in_group = 0;
+    int j = count - 1 - i;
+    prevkey = (char*)keybuf + (j + 1) * key_extent;
+    currkey = (char*)keybuf + (j + 0) * key_extent;
+    result = dtcmp_op_eval(prevkey, currkey, cmp);
+    if (result != 0) {
+      /* the current item is different from the previous item,
+       * so the current item is the start of a new group */
+      first_in_group = 1;
+    }
+
+    /* either reset rtl value or accumulate current value
+     * with running total depending on whether current item
+     * starts a new group or not */
+    currval = (char*)valbuf + j * val_extent;
+    if (first_in_group) {
+      /* right edge of new group, set flag */
+      scan_rtl_high_ints[ASSIGN_STOP] = 1;
+
+      /* copy user data into high buf */
+      DTCMP_Memcpy(scan_rtl_high_val, 1, val, currval, 1, val);
+    } else {
+      /* item is not the start of a new group */
+      /* accumulate user's input in high buffer,
+       * current = temp + current (keep order) */
+      DTCMP_Memcpy(scan_tmp_val, 1, val, currval, 1, val);
+      MPI_Reduce_local(scan_rtl_high_val, scan_tmp_val, 1, val, op);
+      DTCMP_Memcpy(scan_rtl_high_val, 1, val, scan_tmp_val, 1, val);
+    }
   }
 
   /* get first rank to our left if we have one */
@@ -496,32 +261,61 @@ int DTCMP_Segmented_exscan(
 
     /* reduce data from left partner */
     if (left_rank != MPI_PROC_NULL) {
+      /* check whether data is valid from left side */
       if (scan_ltr_recv_ints[ASSIGN_VALID]) {
-        /* accumulate totals at left end in left-to-right scan */
-        if (scan_ltr_low_ints[ASSIGN_FLAG] != 1) {
-          scan_ltr_low_ints[ASSIGN_FLAG] = scan_ltr_recv_ints[ASSIGN_FLAG];
-          if (scan_ltr_low_ints[ASSIGN_VALID]) {
-            /* accumulate received value into ours */
-            MPI_Reduce_local(scan_ltr_recv_val, scan_ltr_low_val, 1, val, op);
-          } else {
-            /* if our low value is not valid, copy the one received */
-            scan_ltr_low_ints[ASSIGN_VALID] = 1;
-            DTCMP_Memcpy(scan_ltr_low_key, 1, key, scan_ltr_recv_key, 1, key);
-            DTCMP_Memcpy(scan_ltr_low_val, 1, val, scan_ltr_recv_val, 1, val);
+        /* we got valid data from the left side, process it */
+
+        /* check whether our current low value is valid */
+        if (! scan_ltr_low_ints[ASSIGN_VALID]) {
+          /* our current low value is not valid, copy received */
+          DTCMP_Memcpy(scan_ltr_low, 1, type_item, scan_ltr_recv, 1, type_item);
+        } else {
+          /* we have valid data and we got valid data from the left side,
+           * check whether we should accumulate into low end of ltr scan */
+          if (! scan_ltr_low_ints[ASSIGN_STOP]) {
+            /* we've not seen a flag to stop accumulating yet,
+             * check whether its key matches ours */
+            int result = dtcmp_op_eval(scan_ltr_low_key, scan_ltr_recv_key, cmp);
+            if (result != 0) {
+              /* keys differ, we are first item of a group */
+              scan_ltr_low_ints[ASSIGN_STOP] = 1;
+            }
+
+            /* if we still need to accumulate, add the value */
+            if (! scan_ltr_low_ints[ASSIGN_STOP]) {
+              /* accumulate received value into ours */
+              MPI_Reduce_local(scan_ltr_recv_val, scan_ltr_low_val, 1, val, op);
+
+              /* set our stop bit according to received data */
+              scan_ltr_low_ints[ASSIGN_STOP] = scan_ltr_recv_ints[ASSIGN_STOP];
+            }
           }
         }
 
-        /* accumulate total at right end in left-to-right scan */
-        if (scan_ltr_high_ints[ASSIGN_FLAG] != 1) {
-          scan_ltr_high_ints[ASSIGN_FLAG] = scan_ltr_recv_ints[ASSIGN_FLAG];
-          if (scan_ltr_high_ints[ASSIGN_VALID]) {
-            /* accumulate received value into ours */
-            MPI_Reduce_local(scan_ltr_recv_val, scan_ltr_high_val, 1, val, op);
-          } else {
-            /* if our high value is not valid, copy the one received */
-            scan_ltr_high_ints[ASSIGN_VALID] = 1;
-            DTCMP_Memcpy(scan_ltr_high_key, 1, key, scan_ltr_recv_key, 1, key);
-            DTCMP_Memcpy(scan_ltr_high_val, 1, val, scan_ltr_recv_val, 1, val);
+        /* check whether our current high value is valid */
+        if (! scan_ltr_high_ints[ASSIGN_VALID]) {
+          /* our current high value is not valid, copy received */
+          DTCMP_Memcpy(scan_ltr_high, 1, type_item, scan_ltr_recv, 1, type_item);
+        } else {
+          /* we have valid data and we got valid data from the left side,
+           * check whether we should accumulate into high end of ltr scan */
+          if (! scan_ltr_high_ints[ASSIGN_STOP]) {
+            /* we've not seen a flag to stop accumulating yet,
+             * check whether its key matches ours */
+            int result = dtcmp_op_eval(scan_ltr_high_key, scan_ltr_recv_key, cmp);
+            if (result != 0) {
+              /* keys differ, we are first item of a group */
+              scan_ltr_high_ints[ASSIGN_STOP] = 1;
+            }
+
+            /* if we still need to accumulate, add the value */
+            if (! scan_ltr_high_ints[ASSIGN_STOP]) {
+              /* accumulate received value into ours */
+              MPI_Reduce_local(scan_ltr_recv_val, scan_ltr_high_val, 1, val, op);
+
+              /* set our stop bit according to received data */
+              scan_ltr_high_ints[ASSIGN_STOP] = scan_ltr_recv_ints[ASSIGN_STOP];
+            }
           }
         }
       }
@@ -532,56 +326,144 @@ int DTCMP_Segmented_exscan(
 
     /* reduce data from right partner */
     if (right_rank != MPI_PROC_NULL) {
+      /* check whether data is valid from right side */
       if (scan_rtl_recv_ints[ASSIGN_VALID]) {
-        /* accumulate totals at right end in right-to-left scan */
-        if (scan_rtl_low_ints[ASSIGN_FLAG] != 1) {
-          scan_rtl_low_ints[ASSIGN_FLAG] = scan_rtl_recv_ints[ASSIGN_FLAG];
-          if (scan_rtl_low_ints[ASSIGN_VALID]) {
-            /* accumulate received value into ours */
-            MPI_Reduce_local(scan_rtl_recv_val, scan_rtl_low_val, 1, val, op);
-          } else {
-            /* if our low value is not valid, copy the one received */
-            scan_rtl_low_ints[ASSIGN_VALID] = 1;
-            DTCMP_Memcpy(scan_rtl_low_key, 1, key, scan_rtl_recv_key, 1, key);
-            DTCMP_Memcpy(scan_rtl_low_val, 1, val, scan_rtl_recv_val, 1, val);
+        /* we got valid data from the right side, process it */
+
+        /* check whether our current low value is valid */
+        if (! scan_rtl_low_ints[ASSIGN_VALID]) {
+          /* our current low value is not valid, copy received */
+          DTCMP_Memcpy(scan_rtl_low, 1, type_item, scan_rtl_recv, 1, type_item);
+        } else {
+          /* we have valid data and we got valid data from the right side,
+           * check whether we should accumulate into low end of rtl scan */
+          if (! scan_rtl_low_ints[ASSIGN_STOP]) {
+            /* we've not seen a flag to stop accumulating yet,
+             * check whether its key matches ours */
+            int result = dtcmp_op_eval(scan_rtl_low_key, scan_rtl_recv_key, cmp);
+            if (result != 0) {
+              /* keys differ, we are first item of a group */
+              scan_rtl_low_ints[ASSIGN_STOP] = 1;
+            }
+
+            /* if we still need to accumulate, add the value */
+            if (! scan_rtl_low_ints[ASSIGN_STOP]) {
+              /* accumulate received value into ours */
+              MPI_Reduce_local(scan_rtl_recv_val, scan_rtl_low_val, 1, val, op);
+
+              /* set our stop bit according to received data */
+              scan_rtl_low_ints[ASSIGN_STOP] = scan_rtl_recv_ints[ASSIGN_STOP];
+            }
           }
         }
 
-        /* accumulate total at left end in right-to-left scan */
-        if (scan_rtl_high_ints[ASSIGN_FLAG] != 1) {
-          scan_rtl_high_ints[ASSIGN_FLAG] = scan_rtl_recv_ints[ASSIGN_FLAG];
-          if (scan_rtl_high_ints[ASSIGN_VALID]) {
-            /* accumulate received value into ours */
-            MPI_Reduce_local(scan_rtl_recv_val, scan_rtl_high_val, 1, val, op);
-          } else {
-            /* if our high value is not valid, copy the one received */
-            scan_rtl_high_ints[ASSIGN_VALID] = 1;
-            DTCMP_Memcpy(scan_rtl_high_key, 1, key, scan_rtl_recv_key, 1, key);
-            DTCMP_Memcpy(scan_rtl_high_val, 1, val, scan_rtl_recv_val, 1, val);
+        /* check whether our current high value is valid */
+        if (! scan_rtl_high_ints[ASSIGN_VALID]) {
+          /* our current high value is not valid, copy received */
+          DTCMP_Memcpy(scan_rtl_high, 1, type_item, scan_rtl_recv, 1, type_item);
+        } else {
+          /* we have valid data and we got valid data from the right side,
+           * check whether we should accumulate into high end of rtl scan */
+          if (! scan_rtl_high_ints[ASSIGN_STOP]) {
+            /* we've not seen a flag to stop accumulating yet,
+             * check whether its key matches ours */
+            int result = dtcmp_op_eval(scan_rtl_high_key, scan_rtl_recv_key, cmp);
+            if (result != 0) {
+              /* keys differ, we are first item of a group */
+              scan_rtl_high_ints[ASSIGN_STOP] = 1;
+            }
+
+            /* if we still need to accumulate, add the value */
+            if (! scan_rtl_high_ints[ASSIGN_STOP]) {
+              /* accumulate received value into ours */
+              MPI_Reduce_local(scan_rtl_recv_val, scan_rtl_high_val, 1, val, op);
+
+              /* set our stop bit according to received data */
+              scan_rtl_high_ints[ASSIGN_STOP] = scan_rtl_recv_ints[ASSIGN_STOP];
+            }
           }
         }
       }
 
-      /* get the next rank on the left */
+      /* get the next rank on the right */
       right_rank = scan_rtl_recv_ints[ASSIGN_NEXT];
     }
   }
 
   /* if low scan value is valid, initialize our high value */
-  if (scan_ltr_low_ints[ASSIGN_VALID]) {
-    DTCMP_Memcpy(scan_ltr_high_val, 1, val, scan_ltr_low_val, 1, val);
-  }
-  if (scan_rtl_low_ints[ASSIGN_VALID]) {
-    DTCMP_Memcpy(scan_rtl_high_val, 1, val, scan_rtl_low_val, 1, val);
+  if (count > 0) {
+    /* if we have a low ltr value, compare our first key to that,
+     * otherwise initialize accumulator to our first value */
+    int first_in_group = 1;
+    if (scan_ltr_low_ints[ASSIGN_VALID]) {
+      char* prevkey = scan_ltr_low_key;
+      char* currkey = (char*)keybuf;
+      int result = dtcmp_op_eval(prevkey, currkey, cmp);
+      if (result == 0) {
+        /* keys match, so set first buffer to low value */
+        char* ltrval = (char*)ltrbuf;
+        DTCMP_Memcpy(ltrval, 1, val, scan_ltr_low_val, 1, val);
+        first_in_group = 0;
+      }
+    }
+
+    /* initialize accumulator (use high buffer) */
+    char* currval = (char*)valbuf;
+    if (first_in_group) {
+      /* init our accumulator with user's data if we start a new group */
+      DTCMP_Memcpy(scan_ltr_high_val, 1, val, currval, 1, val);
+    } else {
+      /* otherwise init accumulator with low data */
+      DTCMP_Memcpy(scan_ltr_high_val, 1, val, scan_ltr_low_val, 1, val);
+
+      /* add users data to accumulation, be careful with the order here */
+      DTCMP_Memcpy(scan_tmp_val, 1, val, currval, 1, val);
+      MPI_Reduce_local(scan_ltr_high_val, scan_tmp_val, 1, val, op);
+      DTCMP_Memcpy(scan_ltr_high_val, 1, val, scan_tmp_val, 1, val);
+    }
+
+    /* if we have a low rtl value, compare our first key to that,
+     * otherwise initialize accumulator to our first value */
+    first_in_group = 1;
+    int j = count - 1;
+    if (scan_rtl_low_ints[ASSIGN_VALID]) {
+      char* prevkey = scan_rtl_low_key;
+      char* currkey = (char*)keybuf +  j * key_extent;
+      int result = dtcmp_op_eval(prevkey, currkey, cmp);
+      if (result == 0) {
+        /* keys match, so set first buffer to low value */
+        char* rtlval = (char*)rtlbuf + j * val_extent;
+        DTCMP_Memcpy(rtlval, 1, val, scan_rtl_low_val, 1, val);
+        first_in_group = 0;
+      }
+    }
+
+    /* initialize accumulator (use high buffer) */
+    currval = (char*)valbuf + j * val_extent;
+    if (first_in_group) {
+      /* init our accumulator with user's data if we start a new group */
+      DTCMP_Memcpy(scan_rtl_high_val, 1, val, currval, 1, val);
+    } else {
+      /* otherwise init accumulator with low data */
+      DTCMP_Memcpy(scan_rtl_high_val, 1, val, scan_rtl_low_val, 1, val);
+
+      /* add users data to accumulation, be careful with the order here */
+      DTCMP_Memcpy(scan_tmp_val, 1, val, currval, 1, val);
+      MPI_Reduce_local(scan_rtl_high_val, scan_tmp_val, 1, val, op);
+      DTCMP_Memcpy(scan_rtl_high_val, 1, val, scan_tmp_val, 1, val);
+    }
   }
 
   /* finally set user's output buffers */
-  for (i = 0; i < count; i++) {
+  for (i = 1; i < count; i++) {
     /* get pointer to user's value */
-    char* inval = (char*)valbuf + i * val_extent;
-    if (first_in_group[i]) {
-      /* reinit our accumulator with user's data if we start a new group */
-      DTCMP_Memcpy(scan_ltr_high_val, 1, val, inval, 1, val);
+    char* currval = (char*)valbuf + i * val_extent;
+    char* prevkey = (char*)keybuf + (i - 1) * key_extent;
+    char* currkey = (char*)keybuf + i * key_extent;
+    int result = dtcmp_op_eval(prevkey, currkey, cmp);
+    if (result != 0) {
+      /* keys differ, reinit our accumulator with user's data if we start a new group */
+      DTCMP_Memcpy(scan_ltr_high_val, 1, val, currval, 1, val);
     } else {
       /* otherwise, copy scan result to user's buffer */
       char* ltrval = (char*)ltrbuf + i * val_extent;
@@ -589,17 +471,20 @@ int DTCMP_Segmented_exscan(
       
       /* add users data to accumulation,
        * be careful with the order here */
-      DTCMP_Memcpy(scan_tmp_val, 1, val, inval, 1, val);
+      DTCMP_Memcpy(scan_tmp_val, 1, val, currval, 1, val);
       MPI_Reduce_local(scan_ltr_high_val, scan_tmp_val, 1, val, op);
       DTCMP_Memcpy(scan_ltr_high_val, 1, val, scan_tmp_val, 1, val);
     }
 
     /* get pointer to user's value */
     int j = count - 1 - i;
-    char* endval = (char*)valbuf + j * val_extent;
-    if (last_in_group[j]) {
-      /* reinit our accumulator with user's data if we start a new group */
-      DTCMP_Memcpy(scan_rtl_high_val, 1, val, endval, 1, val);
+    currval = (char*)valbuf + j * val_extent;
+    prevkey = (char*)keybuf + (j + 1) * key_extent;
+    currkey = (char*)keybuf + j * key_extent;
+    result = dtcmp_op_eval(prevkey, currkey, cmp);
+    if (result != 0) {
+      /* keys differ, reinit our accumulator with user's data if we start a new group */
+      DTCMP_Memcpy(scan_rtl_high_val, 1, val, currval, 1, val);
     } else {
       /* otherwise, copy scan result to user's buffer */
       char* rtlval = (char*)rtlbuf + j * val_extent;
@@ -607,13 +492,11 @@ int DTCMP_Segmented_exscan(
       
       /* add users data to accumulation,
        * be careful with the order here */
-      DTCMP_Memcpy(scan_tmp_val, 1, val, endval, 1, val);
+      DTCMP_Memcpy(scan_tmp_val, 1, val, currval, 1, val);
       MPI_Reduce_local(scan_rtl_high_val, scan_tmp_val, 1, val, op);
       DTCMP_Memcpy(scan_rtl_high_val, 1, val, scan_tmp_val, 1, val);
     }
   }
-
-  /* TODO: complete right-to-left scan */
 
   /* free buffers */
   dtcmp_free(&scan_tmp_val);
@@ -626,9 +509,6 @@ int DTCMP_Segmented_exscan(
   dtcmp_free(&scan_rtl_recv);
 
   MPI_Type_free(&type_item);
-
-  dtcmp_free(&first_in_group);
-  dtcmp_free(&last_in_group);
 
   return rc;
 }

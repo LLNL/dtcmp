@@ -21,7 +21,7 @@
 
 //#define SIZE (50)
 //#define SIZE (5)
-#define SIZE (4)
+#define SIZE (12)
 
 int main(int argc, char* argv[])
 {
@@ -55,21 +55,34 @@ int main(int argc, char* argv[])
   int ltrbuf[SIZE];
   int rtlbuf[SIZE];
   for (i = 0; i < SIZE; i++) {
-    scanbuf[i] = (rank * SIZE + i) / 10;
+    //scanbuf[i] = (rank * SIZE + i) / 10;
+    if (rank == 25) {
+        if (i < SIZE/2) scanbuf[i] = 1;
+        else scanbuf[i] = 2;
+    } else if (rank == 32) {
+        if (i < SIZE/2) scanbuf[i] = 2;
+        else scanbuf[i] = 3;
+    }
     valbuf[i]  = 1;
     ltrbuf[i]  = 0;
     rtlbuf[i]  = 0;
   }
 
-  int scansize = SIZE;
-  if (rank == 1) scansize = 0;
+  int scansize = 0;
+  if (rank == 25) scansize = 12;
+  else if (rank == 32) scansize = 8;
   DTCMP_Segmented_exscan(
     scansize, scanbuf, MPI_UNSIGNED_LONG_LONG,
     valbuf, ltrbuf, rtlbuf, MPI_INT,
-    DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE,
+    DTCMP_OP_UINT64T_ASCEND, DTCMP_FLAG_NONE,
     MPI_SUM, MPI_COMM_WORLD
   );
 
+  for (i = 0; i < scansize; i++) {
+    printf("%d: item %d = key %d, ltr %d, rtl %d\n", rank, i, (int)scanbuf[i], ltrbuf[i], rtlbuf[i]);
+  }
+
+#if 0
 //  DTCMP_Sortv(inbuf, outbuf, size, MPI_INT, MPI_INT, DTCMP_OP_INT_DESCEND, MPI_COMM_WORLD);
   //DTCMP_Sort_local(inbuf, outbuf, size, MPI_INT, MPI_INT, DTCMP_OP_INT_DESCEND);
 //  DTCMP_Sort_bitonic(inbuf, outbuf, size, MPI_INT, MPI_INT, DTCMP_OP_INT_ASCEND, MPI_COMM_WORLD);
@@ -180,6 +193,7 @@ int main(int argc, char* argv[])
   MPI_Type_free(&type_2int);
 
   DTCMP_Op_free(&cmp_2int);
+#endif
 
   DTCMP_Finalize();
   MPI_Finalize();
