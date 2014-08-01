@@ -125,7 +125,8 @@ am_libdtcmp_la_OBJECTS = libdtcmp_la-dtcmp.lo \
 	libdtcmp_la-dtcmp_sortv_sortgather_scatter.lo \
 	libdtcmp_la-dtcmp_sortv_cheng.lo \
 	libdtcmp_la-dtcmp_sortz_samplesort.lo \
-	libdtcmp_la-dtcmp_rankv_sort.lo
+	libdtcmp_la-dtcmp_rankv_sort.lo \
+	libdtcmp_la-dtcmp_seg_exscan.lo
 libdtcmp_la_OBJECTS = $(am_libdtcmp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -395,7 +396,8 @@ libdtcmp_la_SOURCES = \
   dtcmp_sortv_sortgather_scatter.c \
   dtcmp_sortv_cheng.c \
   dtcmp_sortz_samplesort.c \
-  dtcmp_rankv_sort.c
+  dtcmp_rankv_sort.c \
+  dtcmp_seg_exscan.c
 
 libdtcmp_la_CFLAGS = $(INCLUDES)
 libdtcmp_la_LIBADD = $(LWGRP_LDFLAGS) $(LWGRP_LIBS)
@@ -488,6 +490,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_partitionz_list.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_rankv_sort.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_search_binary.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_seg_exscan.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_select_local_ends.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_select_local_randpartition.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libdtcmp_la-dtcmp_selectv_medianofmedians.Plo@am__quote@
@@ -715,6 +718,13 @@ libdtcmp_la-dtcmp_rankv_sort.lo: dtcmp_rankv_sort.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dtcmp_rankv_sort.c' object='libdtcmp_la-dtcmp_rankv_sort.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libdtcmp_la_CFLAGS) $(CFLAGS) -c -o libdtcmp_la-dtcmp_rankv_sort.lo `test -f 'dtcmp_rankv_sort.c' || echo '$(srcdir)/'`dtcmp_rankv_sort.c
+
+libdtcmp_la-dtcmp_seg_exscan.lo: dtcmp_seg_exscan.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libdtcmp_la_CFLAGS) $(CFLAGS) -MT libdtcmp_la-dtcmp_seg_exscan.lo -MD -MP -MF $(DEPDIR)/libdtcmp_la-dtcmp_seg_exscan.Tpo -c -o libdtcmp_la-dtcmp_seg_exscan.lo `test -f 'dtcmp_seg_exscan.c' || echo '$(srcdir)/'`dtcmp_seg_exscan.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libdtcmp_la-dtcmp_seg_exscan.Tpo $(DEPDIR)/libdtcmp_la-dtcmp_seg_exscan.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dtcmp_seg_exscan.c' object='libdtcmp_la-dtcmp_seg_exscan.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libdtcmp_la_CFLAGS) $(CFLAGS) -c -o libdtcmp_la-dtcmp_seg_exscan.lo `test -f 'dtcmp_seg_exscan.c' || echo '$(srcdir)/'`dtcmp_seg_exscan.c
 
 mostlyclean-libtool:
 	-rm -f *.lo
