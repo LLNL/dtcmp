@@ -18,12 +18,13 @@
 #define ASSIGN_STOP   (1)
 #define ASSIGN_NEXT   (2)
 
-/* Executes a segmented exclusive scan on items in buf.
+/* Executes a segmented exclusive/inclusive scan on items in buf.
  * Executes specified MPI operation on value data
  * for items whose keys are equal.  Stores result in left-to-right
  * scan in ltrbuf and result of right-to-left scan in rtlbuf.
  * Items must be in sorted order. */
-int DTCMP_Segmented_exscan(
+static int DTCMP_Segmented_scan_base(
+  int exclusive,
   int count,
   const void* keybuf,
   MPI_Datatype key,
@@ -400,10 +401,14 @@ int DTCMP_Segmented_exscan(
       char* currkey = (char*)keybuf;
       int result = dtcmp_op_eval(prevkey, currkey, cmp);
       if (result == 0) {
-        /* keys match, so set first buffer to low value */
-        char* ltrval = (char*)ltrbuf;
-        DTCMP_Memcpy(ltrval, 1, val, scan_ltr_low_val, 1, val);
+        /* keys match, so we're not first in the group */
         first_in_group = 0;
+
+        /* for exclusive scan, set first item in output buffer to low value */
+        if (exclusive) {
+          char* ltrval = (char*)ltrbuf;
+          DTCMP_Memcpy(ltrval, 1, val, scan_ltr_low_val, 1, val);
+        }
       }
     }
 
@@ -422,6 +427,12 @@ int DTCMP_Segmented_exscan(
       DTCMP_Memcpy(scan_ltr_high_val, 1, val, scan_tmp_val, 1, val);
     }
 
+    /* for inclusive scan, we include user's input value in output */
+    if (! exclusive) {
+      char* ltrval = (char*)ltrbuf;
+      DTCMP_Memcpy(ltrval, 1, val, scan_ltr_high_val, 1, val);
+    }
+
     /* if we have a low rtl value, compare our first key to that,
      * otherwise initialize accumulator to our first value */
     first_in_group = 1;
@@ -431,10 +442,14 @@ int DTCMP_Segmented_exscan(
       char* currkey = (char*)keybuf +  j * key_extent;
       int result = dtcmp_op_eval(prevkey, currkey, cmp);
       if (result == 0) {
-        /* keys match, so set first buffer to low value */
-        char* rtlval = (char*)rtlbuf + j * val_extent;
-        DTCMP_Memcpy(rtlval, 1, val, scan_rtl_low_val, 1, val);
+        /* keys match, so we're not first in the group */
         first_in_group = 0;
+
+        /* for exclusive scan, set first item in output buffer to low value */
+        if (exclusive) {
+          char* rtlval = (char*)rtlbuf + j * val_extent;
+          DTCMP_Memcpy(rtlval, 1, val, scan_rtl_low_val, 1, val);
+        }
       }
     }
 
@@ -452,6 +467,12 @@ int DTCMP_Segmented_exscan(
       MPI_Reduce_local(scan_rtl_high_val, scan_tmp_val, 1, val, op);
       DTCMP_Memcpy(scan_rtl_high_val, 1, val, scan_tmp_val, 1, val);
     }
+
+    /* for inclusive scan, we include user's input value in output */
+    if (! exclusive) {
+      char* rtlval = (char*)rtlbuf + j * val_extent;
+      DTCMP_Memcpy(rtlval, 1, val, scan_rtl_high_val, 1, val);
+    }
   }
 
   /* finally set user's output buffers */
@@ -465,15 +486,23 @@ int DTCMP_Segmented_exscan(
       /* keys differ, reinit our accumulator with user's data if we start a new group */
       DTCMP_Memcpy(scan_ltr_high_val, 1, val, currval, 1, val);
     } else {
-      /* otherwise, copy scan result to user's buffer */
-      char* ltrval = (char*)ltrbuf + i * val_extent;
-      DTCMP_Memcpy(ltrval, 1, val, scan_ltr_high_val, 1, val);
+      /* for exclusive scan, copy scan result to user's buffer */
+      if (exclusive) {
+        char* ltrval = (char*)ltrbuf + i * val_extent;
+        DTCMP_Memcpy(ltrval, 1, val, scan_ltr_high_val, 1, val);
+      }
       
       /* add users data to accumulation,
        * be careful with the order here */
       DTCMP_Memcpy(scan_tmp_val, 1, val, currval, 1, val);
       MPI_Reduce_local(scan_ltr_high_val, scan_tmp_val, 1, val, op);
       DTCMP_Memcpy(scan_ltr_high_val, 1, val, scan_tmp_val, 1, val);
+    }
+
+    /* for inclusive scan, include user's input in output buffer */
+    if (! exclusive) {
+      char* ltrval = (char*)ltrbuf + i * val_extent;
+      DTCMP_Memcpy(ltrval, 1, val, scan_ltr_high_val, 1, val);
     }
 
     /* get pointer to user's value */
@@ -486,15 +515,23 @@ int DTCMP_Segmented_exscan(
       /* keys differ, reinit our accumulator with user's data if we start a new group */
       DTCMP_Memcpy(scan_rtl_high_val, 1, val, currval, 1, val);
     } else {
-      /* otherwise, copy scan result to user's buffer */
-      char* rtlval = (char*)rtlbuf + j * val_extent;
-      DTCMP_Memcpy(rtlval, 1, val, scan_rtl_high_val, 1, val);
+      /* for exclusive scan, copy scan result to user's buffer */
+      if (exclusive) {
+        char* rtlval = (char*)rtlbuf + j * val_extent;
+        DTCMP_Memcpy(rtlval, 1, val, scan_rtl_high_val, 1, val);
+      }
       
       /* add users data to accumulation,
        * be careful with the order here */
       DTCMP_Memcpy(scan_tmp_val, 1, val, currval, 1, val);
       MPI_Reduce_local(scan_rtl_high_val, scan_tmp_val, 1, val, op);
       DTCMP_Memcpy(scan_rtl_high_val, 1, val, scan_tmp_val, 1, val);
+    }
+
+    /* for inclusive scan, include user's input in output buffer */
+    if (! exclusive) {
+      char* rtlval = (char*)rtlbuf + j * val_extent;
+      DTCMP_Memcpy(rtlval, 1, val, scan_rtl_high_val, 1, val);
     }
   }
 
@@ -511,4 +548,120 @@ int DTCMP_Segmented_exscan(
   MPI_Type_free(&type_item);
 
   return rc;
+}
+
+/* Executes a segmented inclusive scan on items in buf.
+ * Executes specified MPI operation on value data
+ * for items whose keys are equal.  Stores result in left-to-right
+ * scan in outbuf.
+ * Items must be in sorted order. */
+static int DTCMP_Segmented_scan_ltr_base(
+  int exclusive,
+  int count,
+  const void* keybuf,
+  MPI_Datatype key,
+  const void* valbuf,
+  void* outbuf,
+  MPI_Datatype val,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Op op,
+  MPI_Comm comm)
+{
+  /* get true extent of val type */
+  MPI_Aint val_true_lb, val_true_extent;
+  MPI_Type_get_true_extent(val, &val_true_lb, &val_true_extent);
+
+  /* allocate buffer for right-to-left output */
+  size_t bufsize = count * val_true_extent;
+  void* rtlbuf = dtcmp_malloc(bufsize, 0, __FILE__, __LINE__); 
+
+  int rc = DTCMP_Segmented_scan_base(exclusive, count, keybuf, key, valbuf, outbuf, rtlbuf, val, cmp, hints, op, comm);
+
+  /* free right-to-left buffer */
+  dtcmp_free(&rtlbuf);
+
+  return rc;
+}
+
+/* Executes a segmented exclusive scan on items in buf.
+ * Executes specified MPI operation on value data
+ * for items whose keys are equal.  Stores result in left-to-right
+ * scan in ltrbuf and result of right-to-left scan in rtlbuf.
+ * Items must be in sorted order. */
+int DTCMP_Segmented_exscan(
+  int count,
+  const void* keybuf,
+  MPI_Datatype key,
+  const void* valbuf,
+  void* ltrbuf,
+  void* rtlbuf,
+  MPI_Datatype val,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Op op,
+  MPI_Comm comm)
+{
+  return DTCMP_Segmented_scan_base(1, count, keybuf, key, valbuf, ltrbuf, rtlbuf, val, cmp, hints, op, comm);
+}
+
+/* Executes a segmented exclusive scan on items in buf.
+ * Executes specified MPI operation on value data
+ * for items whose keys are equal.  Stores result in left-to-right
+ * scan in outbuf.
+ * Items must be in sorted order. */
+int DTCMP_Segmented_exscan_ltr(
+  int count,
+  const void* keybuf,
+  MPI_Datatype key,
+  const void* valbuf,
+  void* outbuf,
+  MPI_Datatype val,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Op op,
+  MPI_Comm comm)
+{
+  return DTCMP_Segmented_scan_ltr_base(1, count, keybuf, key, valbuf, outbuf, val, cmp, hints, op, comm);
+}
+
+/* Executes a segmented inclusive scan on items in buf.
+ * Executes specified MPI operation on value data
+ * for items whose keys are equal.  Stores result in left-to-right
+ * scan in ltrbuf and result of right-to-left scan in rtlbuf.
+ * Items must be in sorted order. */
+int DTCMP_Segmented_scan(
+  int count,
+  const void* keybuf,
+  MPI_Datatype key,
+  const void* valbuf,
+  void* ltrbuf,
+  void* rtlbuf,
+  MPI_Datatype val,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Op op,
+  MPI_Comm comm)
+{
+  return DTCMP_Segmented_scan_base(0, count, keybuf, key, valbuf, ltrbuf, rtlbuf, val, cmp, hints, op, comm);
+}
+
+/* Executes a segmented inclusive scan on items in buf.
+ * Executes specified MPI operation on value data
+ * for items whose keys are equal.  Stores result in left-to-right
+ * scan in outbuf.
+ * Items must be in sorted order. */
+int DTCMP_Segmented_scan_ltr(
+  int count,
+  const void* keybuf,
+  MPI_Datatype key,
+  const void* valbuf,
+  void* outbuf,
+  MPI_Datatype val,
+  DTCMP_Op cmp,
+  DTCMP_Flags hints,
+  MPI_Op op,
+  MPI_Comm comm)
+{
+  return DTCMP_Segmented_scan_ltr_base(0, count, keybuf, key, valbuf, outbuf, val, cmp, hints, op, comm);
 }

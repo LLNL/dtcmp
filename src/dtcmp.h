@@ -736,18 +736,86 @@ int DTCMP_Rankv_strings(
  * Segmented scan
  * ---------------------------------------------- */
 
+/* Executes left-to-right and right-to-left segmented exclusive scans,
+ * applying the MPI reduction operator to the input values across
+ * contiguous segments whose keys are equal.  The result of the
+ * left-to-right scan is output in ltrbuf, and the result of the
+ * right-to-left scan is output in rtlbuf.  Output buffer elements
+ * corresponding to the start of a segment are left unmodified. */
 int DTCMP_Segmented_exscan(
-  int count,
-  const void* keybuf,
-  MPI_Datatype key,
-  const void* valbuf,
-  void* ltrbuf,
-  void* rtlbuf,
-  MPI_Datatype val,
-  DTCMP_Op cmp,
-  DTCMP_Flags hints,
-  MPI_Op op,
-  MPI_Comm comm
+  int count,           /* IN  - number of input items on the calling
+                        *       process (non-negative integer) */
+  const void* keybuf,  /* IN  - start of buffer containing keys */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  const void* valbuf,  /* IN  - start of buffer containing values */
+  void* ltrbuf,        /* OUT - start of buffer for left-to-right result */
+  void* rtlbuf,        /* OUT - start of buffer for right-to-left result */
+  MPI_Datatype val,    /* IN  - datatype of value (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
+  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
+  MPI_Op op,           /* IN  - MPI reduction operator (handle) */
+  MPI_Comm comm        /* IN  - communicator on which to execute scan (handle) */
+);
+
+/* Executes left-to-right and right-to-left segmented inclusive scans,
+ * applying the MPI reduction operator to the input values across
+ * contiguous segments whose keys are equal.  The result of the
+ * left-to-right scan is output in ltrbuf, and the result of the
+ * right-to-left scan is output in rtlbuf.  Output buffer elements
+ * corresponding to the start of a segment are initialized with
+ * value from input buffer. */
+int DTCMP_Segmented_scan(
+  int count,           /* IN  - number of input items on the calling
+                        *       process (non-negative integer) */
+  const void* keybuf,  /* IN  - start of buffer containing keys */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  const void* valbuf,  /* IN  - start of buffer containing values */
+  void* ltrbuf,        /* OUT - start of buffer for left-to-right result */
+  void* rtlbuf,        /* OUT - start of buffer for right-to-left result */
+  MPI_Datatype val,    /* IN  - datatype of value (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
+  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
+  MPI_Op op,           /* IN  - MPI reduction operator (handle) */
+  MPI_Comm comm        /* IN  - communicator on which to execute scan (handle) */
+);
+
+/* Executes left-to-right segmented exclusive scan,
+ * applying the MPI reduction operator to the input values across
+ * contiguous segments whose keys are equal.  The result of the
+ * scan is output in outbuf.  Output buffer elements
+ * corresponding to the start of a segment are left unmodified. */
+int DTCMP_Segmented_exscan_ltr(
+  int count,           /* IN  - number of input items on the calling
+                        *       process (non-negative integer) */
+  const void* keybuf,  /* IN  - start of buffer containing keys */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  const void* valbuf,  /* IN  - start of buffer containing values */
+  void* outbuf,        /* OUT - start of buffer for left-to-right result */
+  MPI_Datatype val,    /* IN  - datatype of value (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
+  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
+  MPI_Op op,           /* IN  - MPI reduction operator (handle) */
+  MPI_Comm comm        /* IN  - communicator on which to execute scan (handle) */
+);
+
+/* Executes left-to-right segmented inclusive scan,
+ * applying the MPI reduction operator to the input values across
+ * contiguous segments whose keys are equal.  The result of the
+ * scan is output in outbuf,  Output buffer elements
+ * corresponding to the start of a segment are initialized with
+ * value from input buffer. */
+int DTCMP_Segmented_scan_ltr(
+  int count,           /* IN  - number of input items on the calling
+                        *       process (non-negative integer) */
+  const void* keybuf,  /* IN  - start of buffer containing keys */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  const void* valbuf,  /* IN  - start of buffer containing values */
+  void* outbuf,        /* OUT - start of buffer for left-to-right result */
+  MPI_Datatype val,    /* IN  - datatype of value (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
+  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
+  MPI_Op op,           /* IN  - MPI reduction operator (handle) */
+  MPI_Comm comm        /* IN  - communicator on which to execute scan (handle) */
 );
 
 #ifdef __cplusplus
