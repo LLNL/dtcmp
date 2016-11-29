@@ -45,6 +45,10 @@ static int DTCMP_Segmented_scan_base(
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &ranks);
 
+  /* TODO: The first two fields are just binary flags, so they could be
+   * encoded into a bit field to save space.  Also, the next MPI rank
+   * could be computed, so it's not necessary to send it. */
+
   /* build type for exchange */
   MPI_Datatype type_item;
   MPI_Datatype types[5];
@@ -241,6 +245,9 @@ static int DTCMP_Segmented_scan_base(
       k++;
 
       scan_rtl_high_ints[ASSIGN_NEXT] = right_rank;
+      if (scan_rtl_high_ints[ASSIGN_STOP]) {
+        scan_rtl_high_ints[ASSIGN_NEXT] = MPI_PROC_NULL;
+      }
       MPI_Isend(scan_rtl_high, 1, type_item, left_rank, 0, comm, &request[k]);
       k++;
     }
@@ -251,6 +258,9 @@ static int DTCMP_Segmented_scan_base(
       k++;
 
       scan_ltr_high_ints[ASSIGN_NEXT] = left_rank;
+      if (scan_ltr_high_ints[ASSIGN_STOP]) {
+        scan_ltr_high_ints[ASSIGN_NEXT] = MPI_PROC_NULL;
+      }
       MPI_Isend(scan_ltr_high, 1, type_item, right_rank, 0, comm, &request[k]);
       k++;
     }
