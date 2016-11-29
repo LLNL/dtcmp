@@ -1,4 +1,19 @@
-// mpicc -g -O0 -o segscan segscan.c -I./install/include -L./install/lib -ldtcmp
+/* Copyright (c) 2012, Lawrence Livermore National Security, LLC.
+ * Produced at the Lawrence Livermore National Laboratory.
+ * Written by Adam Moody <moody20@llnl.gov>.
+ * LLNL-CODE-557516.
+ * All rights reserved.
+ * This file is part of the DTCMP library.
+ * For details, see https://github.com/hpc/dtcmp
+ * Please also read this file: LICENSE.TXT. */
+
+// mpicc -g -O0 -o test_segscan test_segscan.c -I./install/include -Wl,-rpath,`pwd`/install/lib -L./install/lib -ldtcmp
+// srun -n4 ./test_segscan
+//
+// This runs a few tests with Segmented scan/exscan operations and
+// verifies the results.  The program prints a message to stdout,
+// and returns with an exit code of 1 if an error is detected,
+// it returns 0 otherwise.
 
 #include <stdlib.h>
 #include <stdio.h>
