@@ -1,7 +1,7 @@
 ##
 # Prologue.
 ##
-AC_INIT([Datatype Comparison Library],[1.0.3],[],[dtcmp],[https://github.com/hpc/dtcmp])
+AC_INIT([Datatype Comparison Library],[1.1.0],[],[dtcmp],[https://github.com/hpc/dtcmp])
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config/config.h])

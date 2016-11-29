@@ -742,7 +742,7 @@ int DTCMP_Rankv_strings(
  * left-to-right scan is output in ltrbuf, and the result of the
  * right-to-left scan is output in rtlbuf.  Output buffer elements
  * corresponding to the start of a segment are left unmodified. */
-int DTCMP_Segmented_exscan(
+int DTCMP_Segmented_exscanv(
   int count,           /* IN  - number of input items on the calling
                         *       process (non-negative integer) */
   const void* keybuf,  /* IN  - start of buffer containing keys */
@@ -764,7 +764,7 @@ int DTCMP_Segmented_exscan(
  * right-to-left scan is output in rtlbuf.  Output buffer elements
  * corresponding to the start of a segment are initialized with
  * value from input buffer. */
-int DTCMP_Segmented_scan(
+int DTCMP_Segmented_scanv(
   int count,           /* IN  - number of input items on the calling
                         *       process (non-negative integer) */
   const void* keybuf,  /* IN  - start of buffer containing keys */
@@ -784,7 +784,7 @@ int DTCMP_Segmented_scan(
  * contiguous segments whose keys are equal.  The result of the
  * scan is output in outbuf.  Output buffer elements
  * corresponding to the start of a segment are left unmodified. */
-int DTCMP_Segmented_exscan_ltr(
+int DTCMP_Segmented_exscanv_ltr(
   int count,           /* IN  - number of input items on the calling
                         *       process (non-negative integer) */
   const void* keybuf,  /* IN  - start of buffer containing keys */
@@ -804,7 +804,7 @@ int DTCMP_Segmented_exscan_ltr(
  * scan is output in outbuf,  Output buffer elements
  * corresponding to the start of a segment are initialized with
  * value from input buffer. */
-int DTCMP_Segmented_scan_ltr(
+int DTCMP_Segmented_scanv_ltr(
   int count,           /* IN  - number of input items on the calling
                         *       process (non-negative integer) */
   const void* keybuf,  /* IN  - start of buffer containing keys */

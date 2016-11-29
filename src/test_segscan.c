@@ -46,16 +46,16 @@ int main(int argc, char* argv[])
     rtl[i] = -1;
   }
 
-  DTCMP_Segmented_exscan(count, keys, MPI_INT, vals, ltr, rtl, MPI_INT, DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_SUM, MPI_COMM_WORLD);
+  DTCMP_Segmented_exscanv(count, keys, MPI_INT, vals, ltr, rtl, MPI_INT, DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_SUM, MPI_COMM_WORLD);
 
 #if 0
-  printf("exscan ltr: %d ", rank);
+  printf("exscanv ltr: %d ", rank);
   for (i = 0; i < count; i++) {
     printf("(%d,%d)=%d, ", keys[i], vals[i], ltr[i]);
   }
   printf("\n");
 
-  printf("exscan rtl: %d ", rank);
+  printf("exscanv rtl: %d ", rank);
   for (i = 0; i < count; i++) {
     printf("(%d, %d)=%d, ", keys[i], vals[i], rtl[i]);
   }
@@ -67,10 +67,10 @@ int main(int argc, char* argv[])
     int val = (rank*count + i) % segment_length;
     if (val == 0 && ltr[i] != -1) {
       rc = 1;
-      printf("ERROR: Segmented_exscan rank=%d ltr[%d]=%d, expected -1\n", rank, i, ltr[i]);
+      printf("ERROR: Segmented_exscanv rank=%d ltr[%d]=%d, expected -1\n", rank, i, ltr[i]);
     } else if (val > 0 && ltr[i] != val) {
       rc = 1;
-      printf("ERROR: Segmented_exscan rank=%d ltr[%d]=%d, expected -1\n", rank, i, ltr[i], val);
+      printf("ERROR: Segmented_exscanv rank=%d ltr[%d]=%d, expected -1\n", rank, i, ltr[i], val);
     }
   }
 
@@ -88,10 +88,10 @@ int main(int argc, char* argv[])
     int actual = rtl[i];
     if (val == (length - 1) && actual != -1) {
       rc = 1;
-      printf("ERROR: Segmented_exscan rank=%d rtl[%d]=%d, expected -1\n", rank, i, actual);
+      printf("ERROR: Segmented_exscanv rank=%d rtl[%d]=%d, expected -1\n", rank, i, actual);
     } else if (val < (length - 1) && actual != (length - val - 1)) {
       rc = 1;
-      printf("ERROR: Segmented_exscan rank=%d rtl[%d]=%d, expected %d\n", rank, i, actual, length - val - 1);
+      printf("ERROR: Segmented_exscanv rank=%d rtl[%d]=%d, expected %d\n", rank, i, actual, length - val - 1);
     }
   }
 
@@ -102,16 +102,16 @@ int main(int argc, char* argv[])
     rtl[i] = -1;
   }
 
-  DTCMP_Segmented_scan(count, keys, MPI_INT, vals, ltr, rtl, MPI_INT, DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_SUM, MPI_COMM_WORLD);
+  DTCMP_Segmented_scanv(count, keys, MPI_INT, vals, ltr, rtl, MPI_INT, DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_SUM, MPI_COMM_WORLD);
 
 #if 0
-  printf("scan ltr: %d ", rank);
+  printf("scanv ltr: %d ", rank);
   for (i = 0; i < count; i++) {
     printf("(%d,%d)=%d, ", keys[i], vals[i], ltr[i]);
   }
   printf("\n");
 
-  printf("scan rtl: %d ", rank);
+  printf("scanv rtl: %d ", rank);
   for (i = 0; i < count; i++) {
     printf("(%d, %d)=%d, ", keys[i], vals[i], rtl[i]);
   }
@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
     int val = (rank*count + i) % segment_length;
     if (ltr[i] != val + 1) {
       rc = 1;
-      printf("ERROR: Segmented_scan rank=%d ltr[%d]=%d, expected -1\n", rank, i, ltr[i], val + 1);
+      printf("ERROR: Segmented_scanv rank=%d ltr[%d]=%d, expected -1\n", rank, i, ltr[i], val + 1);
     }
   }
 
@@ -142,7 +142,7 @@ int main(int argc, char* argv[])
     int expected = length - val;
     if (actual != expected) {
       rc = 1;
-      printf("ERROR: Segmented_scan rank=%d rtl[%d]=%d, expected %d\n", rank, i, actual, expected);
+      printf("ERROR: Segmented_scanv rank=%d rtl[%d]=%d, expected %d\n", rank, i, actual, expected);
     }
   }
 
@@ -153,20 +153,20 @@ int main(int argc, char* argv[])
     rtl[i] = -1;
   }
 
-  DTCMP_Segmented_exscan_ltr(count, keys, MPI_INT, vals, ltr, MPI_INT, DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_SUM, MPI_COMM_WORLD);
+  DTCMP_Segmented_exscanv_ltr(count, keys, MPI_INT, vals, ltr, MPI_INT, DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_SUM, MPI_COMM_WORLD);
 
 #if 0
-  printf("exscan_ltr: %d ", rank);
+  printf("exscanv_ltr: %d ", rank);
   for (i = 0; i < count; i++) {
     printf("(%d,%d)=%d, ", keys[i], vals[i], ltr[i]);
   }
   printf("\n");
 #endif
 
-  DTCMP_Segmented_scan_ltr(count, keys, MPI_INT, vals, ltr, MPI_INT, DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_SUM, MPI_COMM_WORLD);
+  DTCMP_Segmented_scanv_ltr(count, keys, MPI_INT, vals, ltr, MPI_INT, DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_SUM, MPI_COMM_WORLD);
 
 #if 0
-  printf("scan_ltr: %d ", rank);
+  printf("scanv_ltr: %d ", rank);
   for (i = 0; i < count; i++) {
     printf("(%d,%d)=%d, ", keys[i], vals[i], ltr[i]);
   }

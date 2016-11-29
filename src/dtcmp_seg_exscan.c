@@ -599,7 +599,7 @@ static int DTCMP_Segmented_scan_ltr_base(
  * for items whose keys are equal.  Stores result in left-to-right
  * scan in ltrbuf and result of right-to-left scan in rtlbuf.
  * Items must be in sorted order. */
-int DTCMP_Segmented_exscan(
+int DTCMP_Segmented_exscanv(
   int count,
   const void* keybuf,
   MPI_Datatype key,
@@ -620,7 +620,7 @@ int DTCMP_Segmented_exscan(
  * for items whose keys are equal.  Stores result in left-to-right
  * scan in outbuf.
  * Items must be in sorted order. */
-int DTCMP_Segmented_exscan_ltr(
+int DTCMP_Segmented_exscanv_ltr(
   int count,
   const void* keybuf,
   MPI_Datatype key,
@@ -640,7 +640,7 @@ int DTCMP_Segmented_exscan_ltr(
  * for items whose keys are equal.  Stores result in left-to-right
  * scan in ltrbuf and result of right-to-left scan in rtlbuf.
  * Items must be in sorted order. */
-int DTCMP_Segmented_scan(
+int DTCMP_Segmented_scanv(
   int count,
   const void* keybuf,
   MPI_Datatype key,
@@ -661,7 +661,7 @@ int DTCMP_Segmented_scan(
  * for items whose keys are equal.  Stores result in left-to-right
  * scan in outbuf.
  * Items must be in sorted order. */
-int DTCMP_Segmented_scan_ltr(
+int DTCMP_Segmented_scanv_ltr(
   int count,
   const void* keybuf,
   MPI_Datatype key,
