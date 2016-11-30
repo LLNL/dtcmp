@@ -100,6 +100,8 @@ int test_exscanv(int count, int segment_length)
   free(vals);
   free(keys);
 
+  MPI_Barrier(MPI_COMM_WORLD);
+
   return rc;
 }
 
@@ -204,6 +206,8 @@ int test_exscanv_even0(int count, int segment_length)
   free(ltr);
   free(vals);
   free(keys);
+
+  MPI_Barrier(MPI_COMM_WORLD);
 
   return rc;
 }
@@ -318,6 +322,8 @@ int test_exscanv_firsthalf0(int count, int segment_length)
   free(vals);
   free(keys);
 
+  MPI_Barrier(MPI_COMM_WORLD);
+
   return rc;
 }
 
@@ -336,7 +342,7 @@ int test_scanv(int count, int segment_length)
 
   int i;
   for (i = 0; i < count; i++) {
-    keys[i] = (rank*count + i) / 7;
+    keys[i] = (rank*count + i) / segment_length;
     vals[i] = 1;
     ltr[i] = -1;
     rtl[i] = -1;
@@ -395,6 +401,8 @@ int test_scanv(int count, int segment_length)
   free(vals);
   free(keys);
 
+  MPI_Barrier(MPI_COMM_WORLD);
+
   return rc;
 }
 
@@ -438,6 +446,8 @@ int test_exscanv_ltr(int count, int segment_length)
   free(vals);
   free(keys);
 
+  MPI_Barrier(MPI_COMM_WORLD);
+
   return rc;
 }
 
@@ -480,6 +490,8 @@ int test_scanv_ltr(int count, int segment_length)
   free(ltr);
   free(vals);
   free(keys);
+
+  MPI_Barrier(MPI_COMM_WORLD);
 
   return rc;
 }
@@ -528,6 +540,26 @@ int main(int argc, char* argv[])
     rc = tmp_rc;
   }
 
+  tmp_rc = test_exscanv_even0(1, 7);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_exscanv_even0(10, 1);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_exscanv_even0(1, 1);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_exscanv_even0(0, 1);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
   // ----------------------------------------
   // Check exscanv with count=0 on first half of ranks
   // ----------------------------------------
@@ -536,10 +568,50 @@ int main(int argc, char* argv[])
     rc = tmp_rc;
   }
 
+  tmp_rc = test_exscanv_firsthalf0(1, 7);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_exscanv_firsthalf0(10, 1);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_exscanv_firsthalf0(1, 1);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_exscanv_firsthalf0(0, 1);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
   // ----------------------------------------
   // Check scanv
   // ----------------------------------------
   tmp_rc = test_scanv(10, 7);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_scanv(1, 7);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_scanv(10, 1);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_scanv(1, 1);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_scanv(0, 1);
   if (tmp_rc != 0) {
     rc = tmp_rc;
   }
