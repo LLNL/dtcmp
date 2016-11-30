@@ -588,6 +588,69 @@ static int DTCMP_Segmented_scan_ltr_base(
   return rc;
 }
 
+/* Executes a segmented inclusive scan on items in buf.
+ * Executes specified MPI operation on value data
+ * for items whose keys are equal.  Stores result in left-to-right
+ * scan in outbuf.
+ * Items must be in sorted order. */
+static int DTCMP_Segmented_scan_fused_base(
+  int exclusive,
+  int count,
+  const void* buf,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  void* ltrbuf,
+  void* rtlbuf,
+  MPI_Datatype val,
+  MPI_Op op,
+  DTCMP_Flags hints,
+  MPI_Comm comm)
+{
+  /* get extent of key type */
+  MPI_Aint key_lb, key_extent;
+  MPI_Type_get_extent(key, &key_lb, &key_extent);
+
+  /* get extent of keysat type */
+  MPI_Aint keysat_lb, keysat_extent;
+  MPI_Type_get_extent(keysat, &keysat_lb, &keysat_extent);
+
+  /* get extent of val type */
+  MPI_Aint val_lb, val_extent;
+  MPI_Type_get_extent(val, &val_lb, &val_extent);
+
+  /* get true extent of val type */
+  MPI_Aint val_true_lb, val_true_extent;
+  MPI_Type_get_true_extent(val, &val_true_lb, &val_true_extent);
+
+  /* allocate space for value buffer */
+  size_t bufsize = count * val_true_extent;
+  void* valbuf = dtcmp_malloc(bufsize, 0, __FILE__, __LINE__); 
+
+  /* copy stallite portion of keysat from keybuf into valbuf */
+  int i;
+  char* keyptr = (char*) buf;
+  char* valptr = (char*) valbuf;
+  for (i = 0; i < count; i++) {
+    /* get pointer to satellite data */
+    char* ptr = keyptr + key_extent;
+
+    /* copy into value buffer */
+    DTCMP_Memcpy((void*)valptr, 1, val, (void*)ptr, 1, val);
+
+    /* advance pointers for next element */
+    keyptr += keysat_extent;
+    valptr += val_extent;
+  }
+
+  int rc = DTCMP_Segmented_scan_base(exclusive, count, buf, keysat, cmp, valbuf, ltrbuf, rtlbuf, val, op, hints, comm);
+
+  /* free right-to-left buffer */
+  dtcmp_free(&valbuf);
+
+  return rc;
+}
+
 /* Executes a segmented exclusive scan on items in buf.
  * Executes specified MPI operation on value data
  * for items whose keys are equal.  Stores result in left-to-right
@@ -629,6 +692,28 @@ int DTCMP_Segmented_exscanv_ltr(
   return DTCMP_Segmented_scan_ltr_base(1, count, keybuf, key, cmp, valbuf, outbuf, val, op, hints, comm);
 }
 
+/* Executes a segmented exclusive scan on items in buf.
+ * Executes specified MPI operation on value data
+ * for items whose keys are equal.  Input values are assumed
+ * to start at the first byte of the satellite data.  Stores result
+ * in left-to-right scan in ltrbuf and result of right-to-left
+ * scan in rtlbuf.  Items must be in sorted order. */
+int DTCMP_Segmented_exscanv_fused(
+  int count,
+  const void* buf,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  void* ltrbuf,
+  void* rtlbuf,
+  MPI_Datatype val,
+  MPI_Op op,
+  DTCMP_Flags hints,
+  MPI_Comm comm)
+{
+  return DTCMP_Segmented_scan_fused_base(1, count, buf, key, keysat, cmp, ltrbuf, rtlbuf, val, op, hints, comm);
+}
+
 /* Executes a segmented inclusive scan on items in buf.
  * Executes specified MPI operation on value data
  * for items whose keys are equal.  Stores result in left-to-right
@@ -668,4 +753,26 @@ int DTCMP_Segmented_scanv_ltr(
   MPI_Comm comm)
 {
   return DTCMP_Segmented_scan_ltr_base(0, count, keybuf, key, cmp, valbuf, outbuf, val, op, hints, comm);
+}
+
+/* Executes a segmented inclusive scan on items in buf.
+ * Executes specified MPI operation on value data
+ * for items whose keys are equal.  Input values are assumed
+ * to start at the first byte of the satellite data.  Stores result
+ * in left-to-right scan in ltrbuf and result of right-to-left
+ * scan in rtlbuf.  Items must be in sorted order. */
+int DTCMP_Segmented_scanv_fused(
+  int count,
+  const void* buf,
+  MPI_Datatype key,
+  MPI_Datatype keysat,
+  DTCMP_Op cmp,
+  void* ltrbuf,
+  void* rtlbuf,
+  MPI_Datatype val,
+  MPI_Op op,
+  DTCMP_Flags hints,
+  MPI_Comm comm)
+{
+  return DTCMP_Segmented_scan_fused_base(0, count, buf, key, keysat, cmp, ltrbuf, rtlbuf, val, op, hints, comm);
 }

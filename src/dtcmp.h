@@ -818,6 +818,48 @@ int DTCMP_Segmented_scanv_ltr(
   MPI_Comm comm        /* IN  - communicator on which to execute scan (handle) */
 );
 
+/* Executes a segmented exclusive scan on items in buf.
+ * Executes specified MPI operation on value data
+ * for items whose keys are equal.  Input values are assumed
+ * to start at the first byte of the satellite data.  Stores result
+ * in left-to-right scan in ltrbuf and result of right-to-left
+ * scan in rtlbuf.  Items must be in sorted order. */
+int DTCMP_Segmented_exscanv_fused(
+  int count,           /* IN  - number of input items on the calling
+                        *       process (non-negative integer) */
+  const void* buf,     /* IN  - start of buffer containing keys and values */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
+  void* ltrbuf,        /* OUT - start of buffer for left-to-right result */
+  void* rtlbuf,        /* OUT - start of buffer for right-to-left result */
+  MPI_Datatype val,    /* IN  - datatype of value (handle) */
+  MPI_Op op,           /* IN  - MPI reduction operator (handle) */
+  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
+  MPI_Comm comm        /* IN  - communicator on which to execute scan (handle) */
+);
+
+/* Executes a segmented inclusive scan on items in buf.
+ * Executes specified MPI operation on value data
+ * for items whose keys are equal.  Input values are assumed
+ * to start at the first byte of the satellite data.  Stores result
+ * in left-to-right scan in ltrbuf and result of right-to-left
+ * scan in rtlbuf.  Items must be in sorted order. */
+int DTCMP_Segmented_scanv_fused(
+  int count,           /* IN  - number of input items on the calling
+                        *       process (non-negative integer) */
+  const void* buf,     /* IN  - start of buffer containing keys and values */
+  MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  MPI_Datatype keysat, /* IN  - datatype of key and satellite (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
+  void* ltrbuf,        /* OUT - start of buffer for left-to-right result */
+  void* rtlbuf,        /* OUT - start of buffer for right-to-left result */
+  MPI_Datatype val,    /* IN  - datatype of value (handle) */
+  MPI_Op op,           /* IN  - MPI reduction operator (handle) */
+  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
+  MPI_Comm comm        /* IN  - communicator on which to execute scan (handle) */
+);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

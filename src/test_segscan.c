@@ -496,6 +496,164 @@ int test_scanv_ltr(int count, int segment_length)
   return rc;
 }
 
+int test_exscanv_fused(int count, int segment_length)
+{
+  int rc = 0;
+
+  int rank, ranks;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &ranks);
+
+  int* keys = (int*) malloc(count * 2 * sizeof(int));
+  int* ltr  = (int*) malloc(count * sizeof(int));
+  int* rtl  = (int*) malloc(count * sizeof(int));
+
+  int i;
+  for (i = 0; i < count; i++) {
+    keys[i*2] = (rank*count + i) / segment_length; // key
+    keys[i*2+1] = 1; // value
+    ltr[i] = -1;
+    rtl[i] = -1;
+  }
+
+  MPI_Datatype keysat;
+  MPI_Type_contiguous(2, MPI_INT, &keysat);
+  MPI_Type_commit(&keysat);
+
+  DTCMP_Segmented_exscanv_fused(
+    count, keys, MPI_INT, keysat, DTCMP_OP_INT_ASCEND,
+    ltr, rtl, MPI_INT, MPI_SUM,
+    DTCMP_FLAG_NONE, MPI_COMM_WORLD
+  );
+
+  // check ltr results
+  for (i = 0; i < count; i++) {
+    int val = (rank*count + i) % segment_length;
+    int actual = ltr[i];
+    if (val == 0 && actual != -1) {
+      rc = 1;
+      printf("ERROR: Segmented_exscanv rank=%d ltr[%d]=%d, expected -1 @ %s:%d\n", rank, i, actual, __FILE__, __LINE__);
+    } else if (val > 0 && actual != val) {
+      rc = 1;
+      printf("ERROR: Segmented_exscanv rank=%d ltr[%d]=%d, expected -1 @ %s:%d\n", rank, i, actual, val, __FILE__, __LINE__);
+    }
+  }
+
+  // check rtl results
+  int last_length = (ranks * count) % segment_length;
+  int length = segment_length;
+  for (i = 0; i < count; i++) {
+    // if we're in the last segment, it may not be full length
+    int offset = rank * count + i;
+    int remainder = ranks * count - offset;
+    if (remainder <= last_length) {
+      length = last_length;
+    }
+    int val = offset % segment_length;
+    int actual = rtl[i];
+    if (val == (length - 1) && actual != -1) {
+      rc = 1;
+      printf("ERROR: Segmented_exscanv rank=%d rtl[%d]=%d, expected -1 @ %s:%d\n", rank, i, actual, __FILE__, __LINE__);
+    } else if (val < (length - 1) && actual != (length - val - 1)) {
+      rc = 1;
+      printf("ERROR: Segmented_exscanv rank=%d rtl[%d]=%d, expected %d @ %s:%d\n", rank, i, actual, length - val - 1, __FILE__, __LINE__);
+    }
+  }
+
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  MPI_Type_free(&keysat);
+  free(rtl);
+  free(ltr);
+  free(keys);
+
+  return rc;
+}
+
+int test_scanv_fused(int count, int segment_length)
+{
+  int rc = 0;
+
+  int rank, ranks;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &ranks);
+
+  int* keys = (int*) malloc(count * 2 * sizeof(int));
+  int* vals = (int*) malloc(count * sizeof(int));
+  int* ltr  = (int*) malloc(count * sizeof(int));
+  int* rtl  = (int*) malloc(count * sizeof(int));
+
+  int i;
+  for (i = 0; i < count; i++) {
+    keys[i*2] = (rank*count + i) / segment_length; // key
+    keys[i*2+1] = 1; // value
+    ltr[i] = -1;
+    rtl[i] = -1;
+  }
+
+  MPI_Datatype keysat;
+  MPI_Type_contiguous(2, MPI_INT, &keysat);
+  MPI_Type_commit(&keysat);
+
+  DTCMP_Segmented_scanv_fused(
+    count, keys, MPI_INT, keysat, DTCMP_OP_INT_ASCEND,
+    ltr, rtl, MPI_INT, MPI_SUM,
+    DTCMP_FLAG_NONE, MPI_COMM_WORLD
+  );
+
+#if 0
+  printf("scanv ltr: %d ", rank);
+  for (i = 0; i < count; i++) {
+    printf("(%d,%d)=%d, ", keys[i], vals[i], ltr[i]);
+  }
+  printf("\n");
+
+  printf("scanv rtl: %d ", rank);
+  for (i = 0; i < count; i++) {
+    printf("(%d, %d)=%d, ", keys[i], vals[i], rtl[i]);
+  }
+  printf("\n");
+#endif
+
+  // check ltr results
+  for (i = 0; i < count; i++) {
+    int val = (rank*count + i) % segment_length;
+    if (ltr[i] != val + 1) {
+      rc = 1;
+      printf("ERROR: Segmented_scanv rank=%d ltr[%d]=%d, expected -1 @ %s:%d\n", rank, i, ltr[i], val + 1, __FILE__, __LINE__);
+    }
+  }
+
+  // check rtl results
+  int last_length = (ranks * count) % segment_length;
+  int length = segment_length;
+  for (i = 0; i < count; i++) {
+    // if we're in the last segment, it may not be full length
+    int offset = rank * count + i;
+    int remainder = ranks * count - offset;
+    if (remainder <= last_length) {
+      length = last_length;
+    }
+    int val = offset % segment_length;
+    int actual = rtl[i];
+    int expected = length - val;
+    if (actual != expected) {
+      rc = 1;
+      printf("ERROR: Segmented_scanv rank=%d rtl[%d]=%d, expected %d @ %s:%d\n", rank, i, actual, expected, __FILE__, __LINE__);
+    }
+  }
+
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  MPI_Type_free(&keysat);
+  free(rtl);
+  free(ltr);
+  free(vals);
+  free(keys);
+
+  return rc;
+}
+
 int main(int argc, char* argv[])
 {
   int rc = 0;
@@ -628,6 +786,62 @@ int main(int argc, char* argv[])
   // Check that scanv_ltr works
   // ----------------------------------------
   tmp_rc = test_scanv_ltr(10, 7);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  // ----------------------------------------
+  // Check exscanv_fused
+  // ----------------------------------------
+  tmp_rc = test_exscanv_fused(10, 7);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_exscanv_fused(1, 7);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_exscanv_fused(10, 1);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_exscanv_fused(1, 1);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_exscanv_fused(0, 1);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  // ----------------------------------------
+  // Check scanv_fused
+  // ----------------------------------------
+  tmp_rc = test_scanv_fused(10, 7);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_scanv_fused(1, 7);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_scanv_fused(10, 1);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_scanv_fused(1, 1);
+  if (tmp_rc != 0) {
+    rc = tmp_rc;
+  }
+
+  tmp_rc = test_scanv_fused(0, 1);
   if (tmp_rc != 0) {
     rc = tmp_rc;
   }
