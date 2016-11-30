@@ -245,9 +245,6 @@ static int DTCMP_Segmented_scan_base(
       k++;
 
       scan_rtl_high_ints[ASSIGN_NEXT] = right_rank;
-      if (scan_rtl_high_ints[ASSIGN_STOP]) {
-        scan_rtl_high_ints[ASSIGN_NEXT] = MPI_PROC_NULL;
-      }
       MPI_Isend(scan_rtl_high, 1, type_item, left_rank, 0, comm, &request[k]);
       k++;
     }
@@ -258,9 +255,6 @@ static int DTCMP_Segmented_scan_base(
       k++;
 
       scan_ltr_high_ints[ASSIGN_NEXT] = left_rank;
-      if (scan_ltr_high_ints[ASSIGN_STOP]) {
-        scan_ltr_high_ints[ASSIGN_NEXT] = MPI_PROC_NULL;
-      }
       MPI_Isend(scan_ltr_high, 1, type_item, right_rank, 0, comm, &request[k]);
       k++;
     }
