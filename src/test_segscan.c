@@ -95,12 +95,12 @@ int test_exscanv(int count, int segment_length)
     }
   }
 
+  MPI_Barrier(MPI_COMM_WORLD);
+
   free(rtl);
   free(ltr);
   free(vals);
   free(keys);
-
-  MPI_Barrier(MPI_COMM_WORLD);
 
   return rc;
 }
@@ -202,12 +202,12 @@ int test_exscanv_even0(int count, int segment_length)
     }
   }
 
+  MPI_Barrier(MPI_COMM_WORLD);
+
   free(rtl);
   free(ltr);
   free(vals);
   free(keys);
-
-  MPI_Barrier(MPI_COMM_WORLD);
 
   return rc;
 }
@@ -317,12 +317,12 @@ int test_exscanv_firsthalf0(int count, int segment_length)
     }
   }
 
+  MPI_Barrier(MPI_COMM_WORLD);
+
   free(rtl);
   free(ltr);
   free(vals);
   free(keys);
-
-  MPI_Barrier(MPI_COMM_WORLD);
 
   return rc;
 }
@@ -396,12 +396,12 @@ int test_scanv(int count, int segment_length)
     }
   }
 
+  MPI_Barrier(MPI_COMM_WORLD);
+
   free(rtl);
   free(ltr);
   free(vals);
   free(keys);
-
-  MPI_Barrier(MPI_COMM_WORLD);
 
   return rc;
 }
@@ -441,12 +441,12 @@ int test_exscanv_ltr(int count, int segment_length)
   printf("\n");
 #endif
 
+  MPI_Barrier(MPI_COMM_WORLD);
+
   free(rtl);
   free(ltr);
   free(vals);
   free(keys);
-
-  MPI_Barrier(MPI_COMM_WORLD);
 
   return rc;
 }
@@ -486,12 +486,12 @@ int test_scanv_ltr(int count, int segment_length)
   printf("\n");
 #endif
 
+  MPI_Barrier(MPI_COMM_WORLD);
+
   free(rtl);
   free(ltr);
   free(vals);
   free(keys);
-
-  MPI_Barrier(MPI_COMM_WORLD);
 
   return rc;
 }
