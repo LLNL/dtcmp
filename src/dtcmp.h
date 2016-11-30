@@ -747,13 +747,13 @@ int DTCMP_Segmented_exscanv(
                         *       process (non-negative integer) */
   const void* keybuf,  /* IN  - start of buffer containing keys */
   MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
   const void* valbuf,  /* IN  - start of buffer containing values */
   void* ltrbuf,        /* OUT - start of buffer for left-to-right result */
   void* rtlbuf,        /* OUT - start of buffer for right-to-left result */
   MPI_Datatype val,    /* IN  - datatype of value (handle) */
-  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
-  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
   MPI_Op op,           /* IN  - MPI reduction operator (handle) */
+  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
   MPI_Comm comm        /* IN  - communicator on which to execute scan (handle) */
 );
 
@@ -769,13 +769,13 @@ int DTCMP_Segmented_scanv(
                         *       process (non-negative integer) */
   const void* keybuf,  /* IN  - start of buffer containing keys */
   MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
   const void* valbuf,  /* IN  - start of buffer containing values */
   void* ltrbuf,        /* OUT - start of buffer for left-to-right result */
   void* rtlbuf,        /* OUT - start of buffer for right-to-left result */
   MPI_Datatype val,    /* IN  - datatype of value (handle) */
-  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
-  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
   MPI_Op op,           /* IN  - MPI reduction operator (handle) */
+  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
   MPI_Comm comm        /* IN  - communicator on which to execute scan (handle) */
 );
 
@@ -789,12 +789,12 @@ int DTCMP_Segmented_exscanv_ltr(
                         *       process (non-negative integer) */
   const void* keybuf,  /* IN  - start of buffer containing keys */
   MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
   const void* valbuf,  /* IN  - start of buffer containing values */
   void* outbuf,        /* OUT - start of buffer for left-to-right result */
   MPI_Datatype val,    /* IN  - datatype of value (handle) */
-  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
-  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
   MPI_Op op,           /* IN  - MPI reduction operator (handle) */
+  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
   MPI_Comm comm        /* IN  - communicator on which to execute scan (handle) */
 );
 
@@ -809,12 +809,12 @@ int DTCMP_Segmented_scanv_ltr(
                         *       process (non-negative integer) */
   const void* keybuf,  /* IN  - start of buffer containing keys */
   MPI_Datatype key,    /* IN  - datatype of key (handle) */
+  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
   const void* valbuf,  /* IN  - start of buffer containing values */
   void* outbuf,        /* OUT - start of buffer for left-to-right result */
   MPI_Datatype val,    /* IN  - datatype of value (handle) */
-  DTCMP_Op cmp,        /* IN  - key comparison operation (handle) */
-  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
   MPI_Op op,           /* IN  - MPI reduction operator (handle) */
+  DTCMP_Flags hints,   /* IN  - hints/assertions (bit flags) */
   MPI_Comm comm        /* IN  - communicator on which to execute scan (handle) */
 );
 

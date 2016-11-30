@@ -28,13 +28,13 @@ static int DTCMP_Segmented_scan_base(
   int count,
   const void* keybuf,
   MPI_Datatype key,
+  DTCMP_Op cmp,
   const void* valbuf,
   void* ltrbuf,
   void* rtlbuf,
   MPI_Datatype val,
-  DTCMP_Op cmp,
-  DTCMP_Flags hints,
   MPI_Op op,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
   int i, tmp_rc;
@@ -570,12 +570,12 @@ static int DTCMP_Segmented_scan_ltr_base(
   int count,
   const void* keybuf,
   MPI_Datatype key,
+  DTCMP_Op cmp,
   const void* valbuf,
   void* outbuf,
   MPI_Datatype val,
-  DTCMP_Op cmp,
-  DTCMP_Flags hints,
   MPI_Op op,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
   /* get true extent of val type */
@@ -586,7 +586,7 @@ static int DTCMP_Segmented_scan_ltr_base(
   size_t bufsize = count * val_true_extent;
   void* rtlbuf = dtcmp_malloc(bufsize, 0, __FILE__, __LINE__); 
 
-  int rc = DTCMP_Segmented_scan_base(exclusive, count, keybuf, key, valbuf, outbuf, rtlbuf, val, cmp, hints, op, comm);
+  int rc = DTCMP_Segmented_scan_base(exclusive, count, keybuf, key, cmp, valbuf, outbuf, rtlbuf, val, op, hints, comm);
 
   /* free right-to-left buffer */
   dtcmp_free(&rtlbuf);
@@ -603,16 +603,16 @@ int DTCMP_Segmented_exscanv(
   int count,
   const void* keybuf,
   MPI_Datatype key,
+  DTCMP_Op cmp,
   const void* valbuf,
   void* ltrbuf,
   void* rtlbuf,
   MPI_Datatype val,
-  DTCMP_Op cmp,
-  DTCMP_Flags hints,
   MPI_Op op,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
-  return DTCMP_Segmented_scan_base(1, count, keybuf, key, valbuf, ltrbuf, rtlbuf, val, cmp, hints, op, comm);
+  return DTCMP_Segmented_scan_base(1, count, keybuf, key, cmp, valbuf, ltrbuf, rtlbuf, val, op, hints, comm);
 }
 
 /* Executes a segmented exclusive scan on items in buf.
@@ -624,15 +624,15 @@ int DTCMP_Segmented_exscanv_ltr(
   int count,
   const void* keybuf,
   MPI_Datatype key,
+  DTCMP_Op cmp,
   const void* valbuf,
   void* outbuf,
   MPI_Datatype val,
-  DTCMP_Op cmp,
-  DTCMP_Flags hints,
   MPI_Op op,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
-  return DTCMP_Segmented_scan_ltr_base(1, count, keybuf, key, valbuf, outbuf, val, cmp, hints, op, comm);
+  return DTCMP_Segmented_scan_ltr_base(1, count, keybuf, key, cmp, valbuf, outbuf, val, op, hints, comm);
 }
 
 /* Executes a segmented inclusive scan on items in buf.
@@ -644,16 +644,16 @@ int DTCMP_Segmented_scanv(
   int count,
   const void* keybuf,
   MPI_Datatype key,
+  DTCMP_Op cmp,
   const void* valbuf,
   void* ltrbuf,
   void* rtlbuf,
   MPI_Datatype val,
-  DTCMP_Op cmp,
-  DTCMP_Flags hints,
   MPI_Op op,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
-  return DTCMP_Segmented_scan_base(0, count, keybuf, key, valbuf, ltrbuf, rtlbuf, val, cmp, hints, op, comm);
+  return DTCMP_Segmented_scan_base(0, count, keybuf, key, cmp, valbuf, ltrbuf, rtlbuf, val, op, hints, comm);
 }
 
 /* Executes a segmented inclusive scan on items in buf.
@@ -665,13 +665,13 @@ int DTCMP_Segmented_scanv_ltr(
   int count,
   const void* keybuf,
   MPI_Datatype key,
+  DTCMP_Op cmp,
   const void* valbuf,
   void* outbuf,
   MPI_Datatype val,
-  DTCMP_Op cmp,
-  DTCMP_Flags hints,
   MPI_Op op,
+  DTCMP_Flags hints,
   MPI_Comm comm)
 {
-  return DTCMP_Segmented_scan_ltr_base(0, count, keybuf, key, valbuf, outbuf, val, cmp, hints, op, comm);
+  return DTCMP_Segmented_scan_ltr_base(0, count, keybuf, key, cmp, valbuf, outbuf, val, op, hints, comm);
 }

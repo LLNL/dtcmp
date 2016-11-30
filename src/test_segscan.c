@@ -46,7 +46,11 @@ int main(int argc, char* argv[])
     rtl[i] = -1;
   }
 
-  DTCMP_Segmented_exscanv(count, keys, MPI_INT, vals, ltr, rtl, MPI_INT, DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_SUM, MPI_COMM_WORLD);
+  DTCMP_Segmented_exscanv(
+    count, keys, MPI_INT, DTCMP_OP_INT_ASCEND,
+    vals, ltr, rtl, MPI_INT, MPI_SUM,
+    DTCMP_FLAG_NONE, MPI_COMM_WORLD
+  );
 
 #if 0
   printf("exscanv ltr: %d ", rank);
@@ -102,7 +106,11 @@ int main(int argc, char* argv[])
     rtl[i] = -1;
   }
 
-  DTCMP_Segmented_scanv(count, keys, MPI_INT, vals, ltr, rtl, MPI_INT, DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_SUM, MPI_COMM_WORLD);
+  DTCMP_Segmented_scanv(
+    count, keys, MPI_INT, DTCMP_OP_INT_ASCEND,
+    vals, ltr, rtl, MPI_INT, MPI_SUM,
+    DTCMP_FLAG_NONE, MPI_COMM_WORLD
+  );
 
 #if 0
   printf("scanv ltr: %d ", rank);
@@ -153,7 +161,11 @@ int main(int argc, char* argv[])
     rtl[i] = -1;
   }
 
-  DTCMP_Segmented_exscanv_ltr(count, keys, MPI_INT, vals, ltr, MPI_INT, DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_SUM, MPI_COMM_WORLD);
+  DTCMP_Segmented_exscanv_ltr(
+    count, keys, MPI_INT, DTCMP_OP_INT_ASCEND,
+    vals, ltr, MPI_INT, MPI_SUM,
+    DTCMP_FLAG_NONE, MPI_COMM_WORLD
+  );
 
 #if 0
   printf("exscanv_ltr: %d ", rank);
@@ -163,7 +175,11 @@ int main(int argc, char* argv[])
   printf("\n");
 #endif
 
-  DTCMP_Segmented_scanv_ltr(count, keys, MPI_INT, vals, ltr, MPI_INT, DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_SUM, MPI_COMM_WORLD);
+  DTCMP_Segmented_scanv_ltr(
+    count, keys, MPI_INT, DTCMP_OP_INT_ASCEND,
+    vals, ltr, MPI_INT, MPI_SUM,
+    DTCMP_FLAG_NONE, MPI_COMM_WORLD
+  );
 
 #if 0
   printf("scanv_ltr: %d ", rank);
