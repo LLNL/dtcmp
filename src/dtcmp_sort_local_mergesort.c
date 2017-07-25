@@ -58,7 +58,7 @@ int DTCMP_Sort_local_mergesort(
   DTCMP_Op cmp,
   DTCMP_Flags hints)
 {
-  int rc = DTCMP_FAILURE;
+  int rc = DTCMP_SUCCESS;
 
   MPI_Aint lb, extent;
   MPI_Type_get_true_extent(keysat, &lb, &extent);

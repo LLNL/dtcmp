@@ -62,7 +62,7 @@ int DTCMP_Sort_local_randquicksort(
   DTCMP_Op cmp,
   DTCMP_Flags hints)
 {
-  int rc = DTCMP_FAILURE;
+  int rc = DTCMP_SUCCESS;
 
   /* get true extent of keysat type */
   MPI_Aint lb, extent;
