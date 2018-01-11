@@ -167,29 +167,29 @@ static int detect_edges(
   while (left_rank != MPI_PROC_NULL || right_rank != MPI_PROC_NULL) {
     int k = 0;
 
-    /* if we have a left partner, send him our left-going data
-     * and recv his right-going data */
+    /* if we have a left partner, send it our left-going data
+     * and recv its right-going data */
     if (left_rank != MPI_PROC_NULL) {
       /* receive right-going data from the left */
       MPI_Irecv(recv_left_buf, 1, type_item, left_rank, 0, comm, &request[k]);
       k++;
 
       /* inform rank to our left of the rank on our right,
-       * and send him our data */
+       * and send it our data */
       send_left_ints[DETECT_NEXT] = right_rank;
       MPI_Isend(send_left_buf, 1, type_item, left_rank, 0, comm, &request[k]);
       k++;
     }
 
-    /* if we have a right partner, send him our right-going data
-     * and recv his left-going data */
+    /* if we have a right partner, send it our right-going data
+     * and recv its left-going data */
     if (right_rank != MPI_PROC_NULL) {
       /* receive left-going data from the right */
       MPI_Irecv(recv_right_buf, 1, type_item, right_rank, 0, comm, &request[k]);
       k++;
 
       /* inform rank to our right of the rank on our left,
-       * and send him our data */
+       * and send it our data */
       send_right_ints[DETECT_NEXT] = left_rank;
       MPI_Isend(send_right_buf, 1, type_item, right_rank, 0, comm, &request[k]);
       k++;
@@ -200,7 +200,7 @@ static int detect_edges(
       MPI_Waitall(k, request, status);
     }
 
-    /* if we have a left partner, merge his data with our right-going data */
+    /* if we have a left partner, merge its data with our right-going data */
     if (left_rank != MPI_PROC_NULL) {
       if (true_extent > 0 && num > 0 && !made_left_comparison && recv_left_ints[DETECT_VALID]) {
         /* compare our leftmost value with the value we receive from the left,
@@ -222,7 +222,7 @@ static int detect_edges(
       left_rank = recv_left_ints[DETECT_NEXT];
     }
 
-    /* if we have a right partner, merge his data with our left-going data */
+    /* if we have a right partner, merge its data with our left-going data */
     if (right_rank != MPI_PROC_NULL) {
       if (true_extent > 0 && num > 0 && !made_right_comparison && recv_right_ints[DETECT_VALID]) {
         /* compare our rightmost value with the value we receive from the right,
