@@ -1,4 +1,5 @@
-# Overview
+Overview
+========
 The Datatype Comparison (DTCMP) Library provides pre-defined and
 user-defined comparison operations to compare the values of two items
 which can be arbitrary MPI datatypes.  Using these comparison
@@ -78,7 +79,8 @@ enables the library to siphon off and only process the key component if
 needed.  The keysat type is needed to copy full items in memory or
 transfer items between processes.
 
-# Example
+Example
+=======
 As an example use case for DTCMP, consider a problem in which each
 process in MPI_COMM_WORLD has 10 items, each consisting of an integer
 key and a integer satellite value.  One could use DTCMP to globally
@@ -223,7 +225,8 @@ Given the number of characters in a fixed-length string, each function
 returns a committed MPI_Datatype and a newly created DTCMP_Op bound to
 strcmp.
 
-# TODO
+TODO
+====
 Add mechanism to provide assertions in API:
   sorted (locally & globally) - done
   unique (locally & globally) - done
@@ -235,7 +238,8 @@ Find way to support variable length keys (e.g., strings)
 Enable apps/libs to create DTCMP_Handles freeable via DTCMP_FREE
   DTCMP_Handle_create(fn* my_delete, void* my_arg, DTCMP_Handle* out)
 
-# Build
+Build
+=====
 First build and install the LWGRP library, available at [http://github.com/hpc/lwgrp](http://github.com/hpc/lwgrp).
 
 Then to build::
