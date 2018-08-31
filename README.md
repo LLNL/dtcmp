@@ -1,3 +1,4 @@
+# Overview
 The Datatype Comparison (DTCMP) Library provides pre-defined and
 user-defined comparison operations to compare the values of two items
 which can be arbitrary MPI datatypes.  Using these comparison
@@ -32,36 +33,36 @@ performance.
 
 Currently, the following pre-defined comparison operations are
 provided. More will be added with time.  All pre-defined operations
-have the following naming convention:
+have the following naming convention::
 
-  DTCMP_OP_<TYPE>_<DIRECTION>
+   DTCMP_OP_<TYPE>_<DIRECTION>
 
-where <TYPE> may be one of
+where <TYPE> may be one of::
 
-  SHORT            - C short
-  INT              - C int
-  LONG             - C long
-  LONGLONG         - C long long
-  UNSIGNEDSHORT    - C unsigned short
-  UNSIGNEDINT      - C unsigned int
-  UNSIGNEDLONG     - C unsigned long
-  UNSIGNEDLONGLONG - C unsigned long long
-  INT8T            - C int8_t
-  INT16T           - C int16_t
-  INT32T           - C int32_t
-  INT64T           - C int64_t
-  UINT8T           - C uint8_t
-  UINT16T          - C uint16_t
-  UINT32T          - C uint32_t
-  UINT64T          - C uint64_t
-  FLOAT            - C float
-  DOUBLE           - C double
-  LONGDOUBLE       - C long double
+   SHORT            - C short
+   INT              - C int
+   LONG             - C long
+   LONGLONG         - C long long
+   UNSIGNEDSHORT    - C unsigned short
+   UNSIGNEDINT      - C unsigned int
+   UNSIGNEDLONG     - C unsigned long
+   UNSIGNEDLONGLONG - C unsigned long long
+   INT8T            - C int8_t
+   INT16T           - C int16_t
+   INT32T           - C int32_t
+   INT64T           - C int64_t
+   UINT8T           - C uint8_t
+   UINT16T          - C uint16_t
+   UINT32T          - C uint32_t
+   UINT64T          - C uint64_t
+   FLOAT            - C float
+   DOUBLE           - C double
+   LONGDOUBLE       - C long double
 
-and <DIRECTION> may be one of:
+and <DIRECTION> may be one of::
 
-  ASCEND  - order values from smallest to largest
-  DESCEND - order values from largest to smallest
+   ASCEND  - order values from smallest to largest
+   DESCEND - order values from largest to smallest
 
 Often when sorting data, each item contains a "key" that determines
 its position within the global order and a "value", called "satellite
@@ -77,24 +78,25 @@ enables the library to siphon off and only process the key component if
 needed.  The keysat type is needed to copy full items in memory or
 transfer items between processes.
 
+# Example
 As an example use case for DTCMP, consider a problem in which each
 process in MPI_COMM_WORLD has 10 items, each consisting of an integer
 key and a integer satellite value.  One could use DTCMP to globally
-sort and redistribute these items across the communicator like so:
+sort and redistribute these items across the communicator like so::
 
-  int inbuf[20] = {... 10 key/satellite pairs ...};
-  int outbuf[20];
-
-  MPI_Datatype keysat;
-  MPI_Type_contiguous(2, MPI_INT, &keysat);
-  MPI_Type_commit(&keysat);
-
-  DTCMP_Sort(
-    inbuf, outbuf, 10, MPI_INT, keysat,
-    DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_COMM_WORLD
-  );
-
-  MPI_Type_free(&keysat);
+   int inbuf[20] = {... 10 key/satellite pairs ...};
+   int outbuf[20];
+ 
+   MPI_Datatype keysat;
+   MPI_Type_contiguous(2, MPI_INT, &keysat);
+   MPI_Type_commit(&keysat);
+ 
+   DTCMP_Sort(
+     inbuf, outbuf, 10, MPI_INT, keysat,
+     DTCMP_OP_INT_ASCEND, DTCMP_FLAG_NONE, MPI_COMM_WORLD
+   );
+ 
+   MPI_Type_free(&keysat);
 
 Each process creates a datatype to describe the key with its satellite,
 which is the keysat type that consists of 2 consecutive integers.  Then
@@ -121,12 +123,12 @@ one to create compound keys whose components are compared
 lexicographically in series.  For example, if each process has a
 compound key consisting of two ints which should be ordered with the
 first int in increasing order and then the second int in decreasing
-order, one can combine two pre-defined comparison operations like so:
+order, one can combine two pre-defined comparison operations like so::
 
-  DTCMP_Op op;
-  DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_DESCEND, &op);
-  ... use op ...
-  DTCMP_Op_free(&op);
+   DTCMP_Op op;
+   DTCMP_Op_create_series(DTCMP_OP_INT_ASCEND, DTCMP_OP_INT_DESCEND, &op);
+   ... use op ...
+   DTCMP_Op_free(&op);
 
 This function will compare key values by the first comparison operation,
 and then by the second if the first is equal.  One can chain together
@@ -147,23 +149,23 @@ before more significant components.
 One can also create a new operation with DTCMP_Op_create, which takes a
 datatype to specify the key and a function pointer to be called to
 compare two key values.  This function pointer has the same prototype
-as a qsort() comparison operation:
+as a qsort() comparison operation::
 
-  int my_compare_op(const void* a, const void* b);
+   int my_compare_op(const void* a, const void* b);
 
-Such a function should return:
+Such a function should return::
 
-  negative int if *a < *b
-             0 if *a = *b
-  positive int if *a > *b
+   negative int if *a < *b
+              0 if *a = *b
+   positive int if *a > *b
 
-Given such a function, one can create a new op like so:
+Given such a function, one can create a new op like so::
 
-  MPI_Datatype key; // datatype that describes key value
-  DTCMP_Op op;
-  DTCMP_Op_create(key, my_compare_op, &op);
-  ... use op ...
-  DTCMP_Op_free(&op);
+   MPI_Datatype key; // datatype that describes key value
+   DTCMP_Op op;
+   DTCMP_Op_create(key, my_compare_op, &op);
+   ... use op ...
+   DTCMP_Op_free(&op);
 
 The operation encodes the key datatype, its extent, and a pointer to
 the comparison operation function.  Once a new operation has been
@@ -180,25 +182,30 @@ Since the keys are variable length, there are not predefined operations
 to handle strings.  However, one may still sort strings using an
 algorithm like the following:
 
-1) define a string comparison function:
+1) define a string comparison function::
+
    int my_strcmp(const void* a, const void& b) {
      return strcmp((const char*)a, (const char*)b);
    }
 
-2) determine maximum string length across all procs
+2) determine maximum string length across all procs::
+
    int my_size = strlen(my_str) + 1;
    MPI_Allreduce(&my_size, &max_size, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
-3) allocate buffer of maximum length and copy string
+3) allocate buffer of maximum length and copy string::
+
    char* my_new_str = malloc(max_size);
    strcpy(my_new_str, my_str);
 
-4) create a type of the max length using MPI_Type_contigious:
+4) create a type of the max length using MPI_Type_contigious::
+
    MPI_Datatype my_type;
    MPI_Type_contiguous(max_size, MPI_CHAR, &my_type);
    MPI_Type_commit(&my_type);
 
-5) create a new DTCMP op with DTCMP_Op_create:
+5) create a new DTCMP op with DTCMP_Op_create::
+
    DTCMP_Op my_op;
    DTCMP_Op_create(my_type, my_strcmp, &my_op);
 
@@ -207,16 +214,16 @@ algorithm like the following:
 7) free op and type
 
 Since this use case is common, DTCMP includes two functions that package
-steps 1, 4, and 5 above into a single routine:
+steps 1, 4, and 5 above into a single routine::
 
-DTCMP_Str_create_ascend
-DTCMP_Str_create_descend
+   DTCMP_Str_create_ascend
+   DTCMP_Str_create_descend
 
 Given the number of characters in a fixed-length string, each function
 returns a committed MPI_Datatype and a newly created DTCMP_Op bound to
 strcmp.
 
-TODO:
+# TODO
 Add mechanism to provide assertions in API:
   sorted (locally & globally) - done
   unique (locally & globally) - done
@@ -228,10 +235,11 @@ Find way to support variable length keys (e.g., strings)
 Enable apps/libs to create DTCMP_Handles freeable via DTCMP_FREE
   DTCMP_Handle_create(fn* my_delete, void* my_arg, DTCMP_Handle* out)
 
-BUILD:
-First build and install the LWGRP library, available here:
-http://github.com/hpc/lwgrp
+# Build
+First build and install the LWGRP library, available at [http://github.com/hpc/lwgrp](http://github.com/hpc/lwgrp).
 
-./configure --prefix <installdir> --with-lwgrp=<lwgrp_installdir>
-make
-make install
+Then to build::
+
+   ./configure --prefix <installdir> --with-lwgrp=<lwgrp_installdir>
+   make
+   make install
