@@ -241,7 +241,7 @@ Enable apps/libs to create DTCMP_Handles freeable via DTCMP_FREE:
 
 Build
 =====
-First build and install the LWGRP library, available at [http://github.com/hpc/lwgrp](http://github.com/hpc/lwgrp>).
+First build and install the LWGRP library, available at [http://github.com/llnl/lwgrp](http://github.com/llnl/lwgrp).
 
 Then to build:
 
