@@ -239,7 +239,7 @@ static void dtcmp_reducefn_randroot(
 }
 
 /* initialize the sorting library */
-int DTCMP_Init()
+int DTCMP_Init(void)
 {
   /* increment the number of times init has been called */
   dtcmp_init_count++;
@@ -319,7 +319,7 @@ int DTCMP_Init()
 
 /* finalize the sorting library and set static values back
  * to their pre-init state */
-int DTCMP_Finalize()
+int DTCMP_Finalize(void)
 {
   /* if we're going to 0, free everything off */
   if (dtcmp_init_count == 1) {

@@ -66,10 +66,10 @@ typedef uint32_t DTCMP_Flags;
  * ---------------------------------------------- */
 
 /* initialize the DTCMP library, call after MPI_Init */
-int DTCMP_Init();
+int DTCMP_Init(void);
 
 /* shut down the DTCMP library, call before MPI_Finalize */
-int DTCMP_Finalize();
+int DTCMP_Finalize(void);
 
 /* ----------------------------------------------
  * Functions to create types
