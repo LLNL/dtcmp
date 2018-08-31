@@ -7,13 +7,12 @@ operations, the library provides various routines for manipulating
 data, which may be distributed over the processes of an MPI
 communicator including:
 
-  search - search for a target value in an ordered list of values
-  merge  - combine multiple ordered lists into a single ordered list
-  partition - divide a list of items into lower and higher values
-              around a specified pivot value
-  select - identify the kth largest value
-  sort - sort data items into an ordered list
-  rank - assign group ids and ranks to a list of items
+ - search - search for a target value in an ordered list of values
+ - merge  - combine multiple ordered lists into a single ordered list
+ - partition - divide a list of items into lower and higher values around a specified pivot value
+ - select - identify the kth largest value
+ - sort - sort data items into an ordered list
+ - rank - assign group ids and ranks to a list of items
 
 The DTCMP library is designed to provide a high-level interface to the
 above functionality.  These high-level routines will invoke various
@@ -182,38 +181,38 @@ extent=true extent, and extent=size.
 A common need is to sort strings, which may be of variable length.
 Since the keys are variable length, there are not predefined operations
 to handle strings.  However, one may still sort strings using an
-algorithm like the following:
+algorithm like the following::
 
-1) define a string comparison function::
-
-   int my_strcmp(const void* a, const void& b) {
-     return strcmp((const char*)a, (const char*)b);
-   }
-
-2) determine maximum string length across all procs::
-
-   int my_size = strlen(my_str) + 1;
-   MPI_Allreduce(&my_size, &max_size, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-
-3) allocate buffer of maximum length and copy string::
-
-   char* my_new_str = malloc(max_size);
-   strcpy(my_new_str, my_str);
-
-4) create a type of the max length using MPI_Type_contigious::
-
-   MPI_Datatype my_type;
-   MPI_Type_contiguous(max_size, MPI_CHAR, &my_type);
-   MPI_Type_commit(&my_type);
-
-5) create a new DTCMP op with DTCMP_Op_create::
-
-   DTCMP_Op my_op;
-   DTCMP_Op_create(my_type, my_strcmp, &my_op);
-
-6) use copy of string, new type, and new op in any DTCMP calls
-
-7) free op and type
+   1) define a string comparison function:
+   
+      int my_strcmp(const void* a, const void& b) {
+        return strcmp((const char*)a, (const char*)b);
+      }
+   
+   2) determine maximum string length across all procs:
+   
+      int my_size = strlen(my_str) + 1;
+      MPI_Allreduce(&my_size, &max_size, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+   
+   3) allocate buffer of maximum length and copy string:
+   
+      char* my_new_str = malloc(max_size);
+      strcpy(my_new_str, my_str);
+   
+   4) create a type of the max length using MPI_Type_contigious:
+   
+      MPI_Datatype my_type;
+      MPI_Type_contiguous(max_size, MPI_CHAR, &my_type);
+      MPI_Type_commit(&my_type);
+   
+   5) create a new DTCMP op with DTCMP_Op_create:
+   
+      DTCMP_Op my_op;
+      DTCMP_Op_create(my_type, my_strcmp, &my_op);
+   
+   6) use copy of string, new type, and new op in any DTCMP calls
+   
+   7) free op and type
 
 Since this use case is common, DTCMP includes two functions that package
 steps 1, 4, and 5 above into a single routine::
@@ -228,15 +227,18 @@ strcmp.
 TODO
 ====
 Add mechanism to provide assertions in API:
-  sorted (locally & globally) - done
-  unique (locally & globally) - done
-  stable - caller is requesting that sort is stable
-  in_place - caller wants DTCMP to use in-place algorithms
-  deterministic - caller wants deterministic time algorithm
+
+ - sorted (locally & globally) - done
+ - unique (locally & globally) - done
+ - stable - caller is requesting that sort is stable
+ - in_place - caller wants DTCMP to use in-place algorithms
+ - deterministic - caller wants deterministic time algorithm
+
 Routine to return communicator optimized for sorting
 Find way to support variable length keys (e.g., strings)
-Enable apps/libs to create DTCMP_Handles freeable via DTCMP_FREE
-  DTCMP_Handle_create(fn* my_delete, void* my_arg, DTCMP_Handle* out)
+Enable apps/libs to create DTCMP_Handles freeable via DTCMP_FREE::
+
+   DTCMP_Handle_create(fn* my_delete, void* my_arg, DTCMP_Handle* out)
 
 Build
 =====
