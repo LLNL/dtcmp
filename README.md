@@ -182,36 +182,36 @@ Since the keys are variable length, there are not predefined operations
 to handle strings.  However, one may still sort strings using an
 algorithm like the following:
 
- 1) define a string comparison function:
-   
+    1) define a string comparison function:
+
     int my_strcmp(const void* a, const void& b) {
       return strcmp((const char*)a, (const char*)b);
     }
-   
- 2) determine maximum string length across all procs:
-   
+
+    2) determine maximum string length across all procs:
+
     int my_size = strlen(my_str) + 1;
     MPI_Allreduce(&my_size, &max_size, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-   
- 3) allocate buffer of maximum length and copy string:
-   
+
+    3) allocate buffer of maximum length and copy string:
+
     char* my_new_str = malloc(max_size);
     strcpy(my_new_str, my_str);
-   
- 4) create a type of the max length using MPI_Type_contigious:
-   
+
+    4) create a type of the max length using MPI_Type_contigious:
+
     MPI_Datatype my_type;
     MPI_Type_contiguous(max_size, MPI_CHAR, &my_type);
     MPI_Type_commit(&my_type);
-   
- 5) create a new DTCMP op with DTCMP_Op_create:
-   
+
+    5) create a new DTCMP op with DTCMP_Op_create:
+
     DTCMP_Op my_op;
     DTCMP_Op_create(my_type, my_strcmp, &my_op);
-   
- 6) use copy of string, new type, and new op in any DTCMP calls
-   
- 7) free op and type
+
+    6) use copy of string, new type, and new op in any DTCMP calls
+
+    7) free op and type
 
 Since this use case is common, DTCMP includes two functions that package
 steps 1, 4, and 5 above into a single routine:
