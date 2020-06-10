@@ -684,6 +684,15 @@ int DTCMP_Rankv_strings_sort(
   int allmax;
   MPI_Allreduce(&max, &allmax, 1, MPI_INT, MPI_MAX, comm);
 
+  /* bail out with success if no one gave us a string */
+  if (allmax == 0) {
+    /* for this to be 0, all procs must have count = 0,
+     * because if any count > 0, then some process has at least
+     * one string, and the input allreduce value of that process
+     * must be at least 1 since we take strlen(str) + 1 */
+     return DTCMP_SUCCESS;
+  }
+
   /* allocate space to copy our strings into */
   char* buf = dtcmp_malloc(allmax * count, 0, __FILE__, __LINE__);
 
