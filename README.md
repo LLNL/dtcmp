@@ -37,7 +37,7 @@ have the following naming convention:
 
     DTCMP_OP_<TYPE>_<DIRECTION>
 
-where <TYPE> may be one of:
+where TYPE may be one of:
 
     SHORT            - C short
     INT              - C int
@@ -59,7 +59,7 @@ where <TYPE> may be one of:
     DOUBLE           - C double
     LONGDOUBLE       - C long double
 
-and <DIRECTION> may be one of:
+and DIRECTION may be one of:
 
     ASCEND  - order values from smallest to largest
     DESCEND - order values from largest to smallest
