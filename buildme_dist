@@ -1,0 +1,38 @@
+#!/bin/bash
+set -x
+
+mkdir -p deps
+pushd deps
+  installdir=`pwd`/install
+  
+  lwgrp=lwgrp-1.0.2
+  
+  if [ ! -f ${lwgrp}.tar.gz ] ; then
+    wget https://github.com/hpc/lwgrp/releases/download/v1.0.2/${lwgrp}.tar.gz
+  fi
+  
+  rm -rf $installdir
+  
+  rm -rf ${lwgrp}
+  tar -zxf ${lwgrp}.tar.gz
+  pushd ${lwgrp}
+    export CFLAGS=${OPT}
+    ./configure \
+      --prefix=${installdir} \
+      --disable-silent-rules && \
+    make && \
+    make install
+    if [ $? -ne 0 ]; then
+      echo "failed to configure, build, or install liblwgrp"
+      exit 1
+    fi
+  popd
+popd
+
+./autogen.sh
+
+./configure --with-lwgrp=$installdir
+
+make clean
+
+make distcheck DISTCHECK_CONFIGURE_FLAGS="--with-lwgrp=$installdir"
