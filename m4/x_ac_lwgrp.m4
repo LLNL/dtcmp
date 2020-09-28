@@ -47,10 +47,10 @@ AC_DEFUN([X_AC_LWGRP], [
     if test "$with_lwgrp" = check || \
        test "x$_x_ac_lwgrp_dirs" = xyes || \
        test "x$_x_ac_lwgrp_dirs" = "x" ; then
-#      AC_CHECK_LIB([lwgrp], [GCS_Comm_split])
+       AC_CHECK_LIB([lwgrp], [lwgrp_comm_free])
 
       # if we found it, set the build flags
-      if test "$ac_cv_lib_lwgrp_GCS_Comm_split" = yes; then
+      if test "$ac_cv_lib_lwgrp_lwgrp_comm_free" = yes; then
         found=yes
         LWGRP_CFLAGS=""
         LWGRP_LDFLAGS=""
