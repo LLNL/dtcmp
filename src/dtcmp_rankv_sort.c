@@ -695,6 +695,7 @@ int DTCMP_Rankv_strings_sort(
 
   /* allocate space to copy our strings into */
   char* buf = dtcmp_malloc(allmax * count, 0, __FILE__, __LINE__);
+  memset(buf, 0, allmax * count);
 
   /* copy each of our strings into the buffer */
   char* str = buf;
