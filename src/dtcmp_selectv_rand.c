@@ -49,8 +49,6 @@ static int find_kth_item(
   void* found_key,
   MPI_Comm comm)
 {
-  int i;
-
   /* TODO: check that hints say data is locally sorted */
   int sorted = (hints & (DTCMP_FLAG_SORTED | DTCMP_FLAG_SORTED_LOCAL));
   if (! sorted) {
@@ -204,7 +202,7 @@ int DTCMP_Selectv_rand(
   int found;
   find_kth_item(scratch, num, k, key, key, cmp, hints, &found, item, comm);
   if (! found) {
-    printf("ERROR: could not find rank=%llu @ %s:%d\n", k, __FILE__, __LINE__);
+    printf("ERROR: could not find rank=%llu @ %s:%d\n", (unsigned long long) k, __FILE__, __LINE__);
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 

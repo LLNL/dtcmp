@@ -60,7 +60,7 @@ static int compute_rank_index(
  * and upper ranges of ranks as best as possible, and returns partitioned
  * items in newly allocate memory (outbuf, outcount, handle) */
 int DTCMP_Partitionz(
-  const void* buf,
+  void* buf, /* TODO: change this to const */
   int count,
   uint64_t k,
   int dividerank,
