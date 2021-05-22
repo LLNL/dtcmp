@@ -143,6 +143,7 @@ static int dtcmp_type_is_valid(MPI_Datatype type)
   return 1;
 }
 
+#if 0
 static int dtcmp_op_is_valid(DTCMP_Op cmp)
 {
   if (cmp == DTCMP_OP_NULL) {
@@ -156,6 +157,7 @@ static int dtcmp_op_is_valid(DTCMP_Op cmp)
 
   return 1;
 }
+#endif
 
 /* user-defined reduction operation to compute min/max/sum */
 static void dtcmp_reducefn_uint64t_min_max_sum(

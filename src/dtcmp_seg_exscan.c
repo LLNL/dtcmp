@@ -37,7 +37,7 @@ static int DTCMP_Segmented_scan_base(
   DTCMP_Flags hints,
   MPI_Comm comm)
 {
-  int i, tmp_rc;
+  int i;
   int rc = DTCMP_SUCCESS;
 
   /* get our rank and number of ranks in the communicator */

@@ -180,8 +180,6 @@ static int find_kth_item(
   void* found_key,
   MPI_Comm comm)
 {
-  int i;
-
   /* get number of ranks in our communicator */
   int ranks;
   MPI_Comm_size(comm, &ranks);
@@ -357,7 +355,7 @@ int DTCMP_Selectv_medianofmedians(
   int found;
   find_kth_item(scratch, num, k, key, key, cmp, hints, &found, item, comm);
   if (! found) {
-    printf("ERROR: could not find rank=%llu @ %s:%d\n", k, __FILE__, __LINE__);
+    printf("ERROR: could not find rank=%llu @ %s:%d\n", (unsigned long long) k, __FILE__, __LINE__);
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
