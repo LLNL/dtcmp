@@ -6,7 +6,7 @@ This is an open source project. We welcome contributions via pull requests as we
 
 If you aren't an SCR developer at LLNL or VELOC developer as part of ECP, you won't have permission to push new branches to the repository. First, you should create a fork. This will create your copy of this repository and ensure you can push your changes up to GitHub and create PRs. This project uses ECP internal resources via gitlab runners to test code changes. Please include details on how we can test your contribution.
 
-* Create your branches off the `master` branch.
+* Create your branches off the `main` branch.
 * Clearly name your branches, commits, and PRs as this will help us manage queued work in a timely manner.
 * Articulate your commit messages in the imperative (e.g., `Adds new privacy policy link to README`).
 * Commit your work in logically organized commits, and group commits together logically in a PR.
