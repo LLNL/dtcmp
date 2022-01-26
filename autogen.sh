@@ -2,11 +2,15 @@
 echo "Running aclocal ... "
 aclocal -I config -I m4
 echo "Running libtoolize ... "
-libtoolize --automake --copy 
+if [ `uname` == "Darwin" ]; then
+    glibtoolize --automake --copy
+else
+    libtoolize --automake --copy
+fi
 echo "Running autoheader ... "
 autoheader
 echo "Running automake ... "
-automake --copy --add-missing 
+automake --copy --add-missing
 echo "Running autoconf ... "
 autoconf
 echo "Cleaning up ..."
