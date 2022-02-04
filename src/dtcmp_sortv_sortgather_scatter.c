@@ -434,8 +434,10 @@ int dtcmp_sortv_scatter_tree(
   DTCMP_Memcpy(outbuf, remainder, keysat, buf, remainder, keysat);
 
   /* free our sort group */
-  lwgrp_comm_free(state->sort_lwgcomm);
-  dtcmp_free(&state->sort_lwgcomm);
+  if (state->sort_lwgcomm != NULL) {
+    lwgrp_comm_free(state->sort_lwgcomm);
+    dtcmp_free(&state->sort_lwgcomm);
+  }
 
   /* free memory */
   dtcmp_free(&state->buf);
