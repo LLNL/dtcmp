@@ -312,8 +312,6 @@ int DTCMP_Init(void)
     DTCMP_Op_create(MPI_FLOAT, dtcmp_op_fn_float_descend, &DTCMP_OP_FLOAT_DESCEND);
     DTCMP_Op_create(MPI_DOUBLE, dtcmp_op_fn_double_ascend,  &DTCMP_OP_DOUBLE_ASCEND);
     DTCMP_Op_create(MPI_DOUBLE, dtcmp_op_fn_double_descend, &DTCMP_OP_DOUBLE_DESCEND);
-    DTCMP_Op_create(MPI_LONG_DOUBLE, dtcmp_op_fn_longdouble_ascend,  &DTCMP_OP_LONGDOUBLE_ASCEND);
-    DTCMP_Op_create(MPI_LONG_DOUBLE, dtcmp_op_fn_longdouble_descend, &DTCMP_OP_LONGDOUBLE_DESCEND);
 
     /* Work around for unsupported MPI_LONG_DOUBLE in Cray MPI.
      * The compile time symbol is defined, but it is set to MPI_DATATYPE_NULL in mpi.h:
