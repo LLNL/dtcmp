@@ -45,10 +45,10 @@ int dtcmp_merge_local_2way_memcpy(
   /* at least one list is empty, copy all elements from
    * the other list (if any) into the merge list */
   if (buf_a != last_a) {
-    int remainder = last_a - buf_a;
+    size_t remainder = last_a - buf_a;
     memcpy(out, buf_a, remainder);
   } else if (buf_b != last_b) {
-    int remainder = last_b - buf_b;
+    size_t remainder = last_b - buf_b;
     memcpy(out, buf_b, remainder);
   }
 
