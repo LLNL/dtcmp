@@ -5,7 +5,7 @@ mkdir -p deps
 pushd deps
   installdir=`pwd`/install
 
-  lwgrp_version=1.0.4
+  lwgrp_version=1.0.5
   lwgrp=lwgrp-${lwgrp_version}
 
   if [ ! -f ${lwgrp}.tar.gz ] ; then
